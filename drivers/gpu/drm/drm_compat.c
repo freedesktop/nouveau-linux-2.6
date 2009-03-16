@@ -26,6 +26,7 @@
  */
 
 #include "drmP.h"
+#include "drm_compat.h"
 
 #ifdef DRM_IDR_COMPAT_FN
 /* only called when idp->lock is held */
@@ -248,5 +249,19 @@ out_unlock:
 	mutex_unlock(&bo->mutex);
 	drm_bo_read_unlock(&dev->bm.bm_lock);
 	return ret;
+}
+#endif
+
+#ifdef DRM_COMPAT_NEEDS_DEV_SET_NAME
+int dev_set_name(struct device *dev, const char *fmt, ...)
+{
+        va_list vargs;
+        char *s;
+        va_start(vargs, fmt);
+        vsnprintf(dev->bus_id, sizeof(dev->bus_id), fmt, vargs);
+        va_end(vargs);
+        while ((s = strchr(dev->bus_id, '/')))
+                *s = '!';
+        return 0;
 }
 #endif

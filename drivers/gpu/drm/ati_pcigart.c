@@ -32,6 +32,7 @@
  */
 
 #include "drmP.h"
+#include "drm_compat.h"
 
 # define ATI_PCIGART_PAGE_SIZE		4096	/**< PCI GART page size */
 

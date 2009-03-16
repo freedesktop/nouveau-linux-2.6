@@ -35,6 +35,7 @@
  */
 
 #include "drmP.h"
+#include "drm_compat.h"
 #include <linux/poll.h>
 #include <linux/smp_lock.h>
 

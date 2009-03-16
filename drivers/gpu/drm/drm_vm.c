@@ -34,8 +34,13 @@
  */
 
 #include "drmP.h"
+#include "drm_compat.h"
 #if defined(__ia64__)
 #include <linux/efi.h>
+#endif
+
+#if defined(CONFIG_X86) && (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26))
+#include <asm/pat.h>
 #endif
 
 static void drm_vm_open(struct vm_area_struct *vma);

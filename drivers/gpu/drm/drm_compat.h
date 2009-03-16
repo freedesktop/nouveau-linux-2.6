@@ -34,6 +34,8 @@
 #ifndef _DRM_COMPAT_H_
 #define _DRM_COMPAT_H_
 
+#include <linux/version.h>
+
 #ifndef minor
 #define minor(x) MINOR((x))
 #endif
@@ -193,10 +195,6 @@ extern struct page *drm_vm_sg_nopage(struct vm_area_struct *vma,
 				     unsigned long address, int *type);
 #endif
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,26))
-#define drm_core_ioremap_wc drm_core_ioremap
-#endif
-
 #ifndef OS_HAS_GEM
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,27))
 #define OS_HAS_GEM 1
@@ -216,6 +214,76 @@ static inline void set_page_locked(struct page *page)
 {
 	set_bit(PG_locked, &page->flags);
 }
+#endif
+
+#ifndef VM_NORESERVE
+/* Just ignore this flag, if it is not available in kernel. */
+#define VM_NORESERVE 0
+#endif
+
+#ifndef _PAGE_CACHE_WC
+/* Just ignore this flag, if it is not available in kernel. */
+#define _PAGE_CACHE_WC 0
+#endif
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,25))
+static inline void agp_flush_chipset(struct agp_bridge_data *bridge)
+{
+	/* This should break only Intel stuff. */
+	(void)bridge;
+}
+
+static inline int set_memory_uc(unsigned long addr, int numpages)
+{
+	(void)addr, (void)numpages;
+	return 0;
+}
+
+static inline int set_memory_wb(unsigned long addr, int numpages)
+{
+	(void)addr, (void)numpages;
+	return 0;
+}
+#endif
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,26))
+static inline void __iomem *ioremap_wc(unsigned long phys_addr,
+						unsigned long size)
+{
+	return ioremap(phys_addr, size);
+}
+
+#define VM_MIXEDMAP VM_PFNMAP
+static inline int vm_insert_mixed(struct vm_area_struct *vma,
+				unsigned long addr, unsigned long pfn)
+{
+	return vm_insert_pfn(vma, addr, pfn);
+}
+
+#define DRM_COMPAT_NEEDS_DEV_SET_NAME 1
+int dev_set_name(struct device *dev, const char *fmt, ...);
+#endif
+
+#ifndef WARN
+#define WARN(condition, format...) WARN_ON(condition)
+#endif
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,27))
+#define dma_mapping_error(dev, addr) dma_mapping_error(addr)
+#define pci_dma_mapping_error(dev, addr) pci_dma_mapping_error(addr)
+#endif
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28))
+#ifndef pgprot_writecombine
+#define pgprot_writecombine pgprot_noncached
+#endif
+#endif
+
+#ifndef upper_32_bits
+#define upper_32_bits(n) ((u32)(((n) >> 16) >> 16))
+#endif
+#ifndef lower_32_bits
+#define lower_32_bits(n) ((u32)(n))
 #endif
 
 #endif

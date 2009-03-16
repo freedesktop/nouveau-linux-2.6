@@ -32,6 +32,7 @@
  */
 
 #include "drmP.h"
+#include "drm_compat.h"
 #include <linux/module.h>
 
 #if __OS_HAS_AGP
