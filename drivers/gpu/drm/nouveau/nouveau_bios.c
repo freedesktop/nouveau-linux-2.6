@@ -23,6 +23,7 @@
  */
 
 #include "drmP.h"
+#include "../drm_compat.h"
 #define NV_DEBUG_NOTRACE
 #include "nouveau_drv.h"
 #include "nouveau_hw.h"

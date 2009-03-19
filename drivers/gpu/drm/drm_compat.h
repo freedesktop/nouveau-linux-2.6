@@ -271,6 +271,9 @@ int dev_set_name(struct device *dev, const char *fmt, ...);
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,27))
 #define dma_mapping_error(dev, addr) dma_mapping_error(addr)
 #define pci_dma_mapping_error(dev, addr) pci_dma_mapping_error(addr)
+#define DRM_COMPAT_NEEDS_PCI_ENABLE_ROM
+int pci_enable_rom(struct pci_dev *pdev);
+void pci_disable_rom(struct pci_dev *pdev);
 #endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28))

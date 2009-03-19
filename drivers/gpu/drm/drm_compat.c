@@ -265,3 +265,48 @@ int dev_set_name(struct device *dev, const char *fmt, ...)
         return 0;
 }
 #endif
+
+#ifdef DRM_COMPAT_NEEDS_PCI_ENABLE_ROM
+/**
+ * pci_enable_rom - enable ROM decoding for a PCI device
+ * @pdev: PCI device to enable
+ *
+ * Enable ROM decoding on @dev.  This involves simply turning on the last
+ * bit of the PCI ROM BAR.  Note that some cards may share address decoders
+ * between the ROM and other resources, so enabling it may disable access
+ * to MMIO registers or other card memory.
+ */
+int pci_enable_rom(struct pci_dev *pdev)
+{
+	struct resource *res = pdev->resource + PCI_ROM_RESOURCE;
+	struct pci_bus_region region;
+	u32 rom_addr;
+
+	if (!res->flags)
+		return -1;
+
+	pcibios_resource_to_bus(pdev, &region, res);
+	pci_read_config_dword(pdev, pdev->rom_base_reg, &rom_addr);
+	rom_addr &= ~PCI_ROM_ADDRESS_MASK;
+	rom_addr |= region.start | PCI_ROM_ADDRESS_ENABLE;
+	pci_write_config_dword(pdev, pdev->rom_base_reg, rom_addr);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pci_enable_rom);
+
+/**
+ * pci_disable_rom - disable ROM decoding for a PCI device
+ * @pdev: PCI device to disable
+ *
+ * Disable ROM decoding on a PCI device by turning off the last bit in the
+ * ROM BAR.
+ */
+void pci_disable_rom(struct pci_dev *pdev)
+{
+	u32 rom_addr;
+	pci_read_config_dword(pdev, pdev->rom_base_reg, &rom_addr);
+	rom_addr &= ~PCI_ROM_ADDRESS_ENABLE;
+	pci_write_config_dword(pdev, pdev->rom_base_reg, rom_addr);
+}
+EXPORT_SYMBOL_GPL(pci_disable_rom);
+#endif
