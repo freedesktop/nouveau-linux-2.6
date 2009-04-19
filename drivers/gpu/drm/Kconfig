@@ -18,6 +18,12 @@ menuconfig DRM
 	  details.  You should also select and configure AGP
 	  (/dev/agpgart) support.
 
+config DRM_TTM
+	tristate "TTM Memory Manager"
+	depends on DRM
+	help
+		Private option
+
 config DRM_TDFX
 	tristate "3dfx Banshee/Voodoo3+"
 	depends on DRM && PCI

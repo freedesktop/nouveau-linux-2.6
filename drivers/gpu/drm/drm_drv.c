@@ -348,6 +348,9 @@ static int __init drm_core_init(void)
 
 	DRM_INFO("Initialized %s %d.%d.%d %s\n",
 		 CORE_NAME, CORE_MAJOR, CORE_MINOR, CORE_PATCHLEVEL, CORE_DATE);
+
+	drm_global_init();
+
 	return 0;
 err_p3:
 	drm_sysfs_destroy();
