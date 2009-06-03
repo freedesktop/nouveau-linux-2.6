@@ -912,7 +912,7 @@ extern int nouveau_gem_ioctl_info(struct drm_device *, void *,
 #define nv_wr16(reg,val) nv_out16(mmio, (reg), (val))
 #define nv_rd08(reg) nv_in08(mmio, (reg))
 #define nv_wr08(reg,val) nv_out08(mmio, (reg), (val))
-#define nv_wait(reg,mask,val) nouveau_wait_until(dev, 1000000000ULL, (reg),    \
+#define nv_wait(reg,mask,val) nouveau_wait_until(dev, 2000000000ULL, (reg),    \
 						 (mask), (val))
 
 /* VRAM access */
