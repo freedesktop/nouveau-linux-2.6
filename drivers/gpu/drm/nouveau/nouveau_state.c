@@ -251,6 +251,7 @@ nouveau_card_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_engine *engine;
+	struct nouveau_gpuobj *gpuobj;
 	int ret;
 
 	NV_DEBUG(dev, "prev state = %d\n", dev_priv->init_state);
@@ -325,25 +326,32 @@ nouveau_card_init(struct drm_device *dev)
 				 NvDmaFB, NvDmaTT);
 	if (ret) return ret;
 
+	gpuobj = NULL;
 	ret = nouveau_gpuobj_dma_new(dev_priv->channel, NV_CLASS_DMA_IN_MEMORY,
 				     0, nouveau_mem_fb_amount(dev),
 				     NV_DMA_ACCESS_RW, NV_DMA_TARGET_VIDMEM,
-				     &dev_priv->channel_vram);
+				     &gpuobj);
 	if (ret) return ret;
 
 	ret = nouveau_gpuobj_ref_add(dev, dev_priv->channel, NvDmaVRAM,
-				     dev_priv->channel_vram, NULL);
-	if (ret) return ret;
+				     gpuobj, NULL);
+	if (ret) {
+		nouveau_gpuobj_del(dev, &gpuobj);
+		return ret;
+	}
 
+	gpuobj = NULL;
 	ret = nouveau_gpuobj_gart_dma_new(dev_priv->channel, 0,
 					  dev_priv->gart_info.aper_size,
-					  NV_DMA_ACCESS_RW,
-					  &dev_priv->channel_gart, NULL);
+					  NV_DMA_ACCESS_RW, &gpuobj, NULL);
 	if (ret) return ret;
 
 	ret = nouveau_gpuobj_ref_add(dev, dev_priv->channel, NvDmaGART,
-				     dev_priv->channel_gart, NULL);
-	if (ret) return ret;
+				     gpuobj, NULL);
+	if (ret) {
+		nouveau_gpuobj_del(dev, &gpuobj);
+		return ret;
+	}
 
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
 		ret = nouveau_parse_bios(dev);
@@ -384,8 +392,6 @@ static void nouveau_card_takedown(struct drm_device *dev)
 		nouveau_backlight_exit(dev);
 
 		if (dev_priv->channel) {
-			nouveau_gpuobj_del(dev, &dev_priv->channel_gart);
-			nouveau_gpuobj_del(dev, &dev_priv->channel_vram);
 			nouveau_fifo_free(dev_priv->channel);
 			dev_priv->channel = NULL;
 		}

@@ -437,8 +437,6 @@ struct drm_nouveau_private {
 
 	struct nouveau_engine engine;
 	struct nouveau_channel *channel;
-	struct nouveau_gpuobj *channel_vram;
-	struct nouveau_gpuobj *channel_gart;
 
 	/* RAMIN configuration, RAMFC, RAMHT and RAMRO offsets */
 	struct nouveau_gpuobj *ramht;
