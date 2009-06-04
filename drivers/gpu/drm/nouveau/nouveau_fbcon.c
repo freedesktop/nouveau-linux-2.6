@@ -495,7 +495,7 @@ static int nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 	size = ALIGN(size, PAGE_SIZE);
 
 	ret = nouveau_bo_new(dev, dev_priv->channel, size, 0, TTM_PL_FLAG_VRAM,
-			     0x0000, false, true, &nvbo);
+			     0, 0x0000, false, true, &nvbo);
 	if (ret) {
 		NV_ERROR(dev, "failed to allocate framebuffer\n");
 		goto out;

@@ -74,8 +74,9 @@ nouveau_bo_del_ttm(struct ttm_buffer_object *bo)
 
 int
 nouveau_bo_new(struct drm_device *dev, struct nouveau_channel *chan,
-	       int size, int align, uint32_t flags, uint32_t tile,
-	       bool no_vm, bool mappable, struct nouveau_bo **pnvbo)
+	       int size, int align, uint32_t flags, uint32_t tile_mode,
+	       uint32_t tile_flags, bool no_vm, bool mappable,
+	       struct nouveau_bo **pnvbo)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_bo *nvbo;
@@ -86,7 +87,8 @@ nouveau_bo_new(struct drm_device *dev, struct nouveau_channel *chan,
 		return -ENOMEM;
 	nvbo->mappable = mappable;
 	nvbo->no_vm = no_vm;
-	nvbo->page_flags = tile;
+	nvbo->tile_mode = tile_mode;
+	nvbo->tile_flags = tile_flags;
 
 	if (!nvbo->mappable && (flags & TTM_PL_FLAG_VRAM))
 		flags |= TTM_PL_FLAG_PRIV0;
@@ -202,15 +204,11 @@ nouveau_gem_info(struct drm_gem_object *gem, struct drm_nouveau_gem_info *rep)
 	else
 		rep->domain = NOUVEAU_GEM_DOMAIN_VRAM;
 
-	if (nvbo->page_flags) {
-		rep->domain |= NOUVEAU_GEM_DOMAIN_TILE;
-		if (nvbo->page_flags == 0x2800)
-			rep->domain |= NOUVEAU_GEM_DOMAIN_TILE_ZETA;
-	}
-
 	rep->size = nvbo->bo.mem.num_pages << PAGE_SHIFT;
 	rep->offset = nvbo->bo.offset;
 	rep->map_handle = nvbo->mappable ? nvbo->bo.addr_space_offset : 0;
+	rep->tile_mode = nvbo->tile_mode;
+	rep->tile_flags = nvbo->tile_flags;
 	return 0;
 }
 
@@ -223,7 +221,7 @@ nouveau_gem_ioctl_new(struct drm_device *dev, void *data,
 	struct nouveau_bo *nvbo = NULL;
 	struct drm_gem_object *gem;
 	struct nouveau_channel *chan = NULL;
-	uint32_t flags = 0, tile = 0;
+	uint32_t flags = 0;
 	int ret = 0;
 
 	NOUVEAU_CHECK_INITIALISED_WITH_RETURN;
@@ -243,18 +241,24 @@ nouveau_gem_ioctl_new(struct drm_device *dev, void *data,
 	if (!flags || req->info.domain & NOUVEAU_GEM_DOMAIN_CPU)
 		flags |= TTM_PL_FLAG_SYSTEM;
 
-	if (req->info.domain & NOUVEAU_GEM_DOMAIN_TILE) {
-		if (req->info.domain & NOUVEAU_GEM_DOMAIN_TILE_ZETA)
-			tile = 0x2800;
-		else
-		if (req->info.domain & NOUVEAU_GEM_DOMAIN_TILE_7A00)
-			tile = 0x7a00;
-		else
-			tile = 0x7000;
+	if (req->info.tile_mode > 4) {
+		NV_ERROR(dev, "bad tile mode: %d\n", req->info.tile_mode);
+		return -EINVAL;
+	}
+
+	switch (req->info.tile_flags) {
+	case 0x0000:
+	case 0x2800:
+	case 0x7000:
+	case 0x7a00:
+		break;
+	default:
+		NV_ERROR(dev, "bad page flags: 0x%08x\n", req->info.tile_flags);
+		return -EINVAL;
 	}
 
 	ret = nouveau_bo_new(dev, chan, req->info.size, req->align, flags,
-			     tile, false,
+			     req->info.tile_mode, req->info.tile_flags, false,
 			     !!(req->info.domain & NOUVEAU_GEM_DOMAIN_MAPPABLE),
 			     &nvbo);
 	if (ret)

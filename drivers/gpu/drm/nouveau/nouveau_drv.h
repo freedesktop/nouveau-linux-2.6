@@ -34,7 +34,7 @@
 
 #define DRIVER_MAJOR		0
 #define DRIVER_MINOR		0
-#define DRIVER_PATCHLEVEL	13
+#define DRIVER_PATCHLEVEL	14
 
 #define NOUVEAU_FAMILY   0x0000FFFF
 #define NOUVEAU_FLAGS    0xFFFF0000
@@ -80,7 +80,8 @@ struct nouveau_bo {
 	bool mappable;
 	bool no_vm;
 
-	uint32_t page_flags;
+	uint32_t tile_mode;
+	uint32_t tile_flags;
 
 	struct drm_gem_object *gem;
 	struct drm_file *cpu_filp;
@@ -853,7 +854,8 @@ nouveau_fence_channel(struct drm_device *dev, uint32_t fence_class);
 extern int nouveau_gem_object_new(struct drm_gem_object *);
 extern void nouveau_gem_object_del(struct drm_gem_object *);
 extern int nouveau_bo_new(struct drm_device *, struct nouveau_channel *,
-			  int size, int align, uint32_t flags, uint32_t tile,
+			  int size, int align, uint32_t flags,
+			  uint32_t tile_mode, uint32_t tile_flags,
 			  bool no_vm, bool mappable, struct nouveau_bo **);
 extern int nouveau_bo_pin(struct nouveau_bo *, uint32_t flags);
 extern int nouveau_bo_unpin(struct nouveau_bo *);

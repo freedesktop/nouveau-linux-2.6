@@ -594,7 +594,7 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 	}
 
 	crtc->fb.offset = fb->nvbo->bo.offset;
-	crtc->fb.tiled = fb->nvbo->page_flags ? true : false;
+	crtc->fb.tiled = fb->nvbo->tile_flags ? true : false;
 	if (!crtc->fb.tiled || dev_priv->chipset == 0x50)
 		crtc->fb.offset -= dev_priv->vm_vram_base;
 
@@ -613,7 +613,7 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 		if (!crtc->fb.blanked && dev_priv->chipset != 0x50)
 			OUT_MODE(NV50_CRTC0_BLANK_CTRL + offset, NvEvoVM);
 		OUT_MODE(NV50_CRTC0_FB_PITCH + offset, (drm_fb->width << 4) |
-						       /* "tile_mode" */ 0);
+						       fb->nvbo->tile_mode);
 	}
 
 	switch (drm_fb->depth) {
@@ -793,7 +793,7 @@ int nv50_crtc_create(struct drm_device *dev, int index)
 	crtc->lut.depth = 0;
 
 	ret = nouveau_bo_new(dev, NULL, 4096, 0x100, TTM_PL_FLAG_VRAM,
-			     0x0000, false, true, &crtc->lut.nvbo);
+			     0, 0x0000, false, true, &crtc->lut.nvbo);
 	if (!ret) {
 		ret = nouveau_bo_map(crtc->lut.nvbo);
 		if (ret)

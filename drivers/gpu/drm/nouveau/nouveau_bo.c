@@ -351,7 +351,7 @@ nouveau_bo_move(struct ttm_buffer_object *bo, bool evict, bool intr,
 
 		ret = nv50_mem_vm_bind_linear(dev,
 					      offset + dev_priv->vm_vram_base,
-					      new_mem->size, nvbo->page_flags,
+					      new_mem->size, nvbo->tile_flags,
 					      offset);
 		if (ret)
 			return ret;
@@ -367,7 +367,7 @@ nouveau_bo_move(struct ttm_buffer_object *bo, bool evict, bool intr,
 		return 0;
 	}
 
-	if (dev_priv->card_type == NV_50 && nvbo->page_flags)
+	if (dev_priv->card_type == NV_50 && nvbo->tile_flags)
 		return ttm_bo_move_memcpy(bo, evict, no_wait, new_mem);
 
 	if (new_mem->mem_type == TTM_PL_SYSTEM) {
