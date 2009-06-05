@@ -236,7 +236,7 @@ nouveau_fifo_user_pushbuf_alloc(struct drm_device *dev)
 
 	ret = nouveau_bo_new(dev, NULL, config->cmdbuf.size, 0,
 			     config->cmdbuf.location, 0, 0x0000,
-			     true, true, &pushbuf);
+			     false, true, &pushbuf);
 	if (ret) {
 		NV_ERROR(dev, "error allocating DMA push buffer: %d\n", ret);
 		return NULL;

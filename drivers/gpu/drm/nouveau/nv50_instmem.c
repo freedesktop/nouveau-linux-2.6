@@ -34,6 +34,7 @@ struct nv50_instmem_priv {
 
 	struct nouveau_gpuobj_ref *pramin_pt;
 	struct nouveau_gpuobj_ref *pramin_bar;
+	struct nouveau_gpuobj_ref *fb_bar;
 
 	bool last_access_wr;
 };
@@ -213,12 +214,25 @@ nv50_instmem_init(struct drm_device *dev)
 	BAR0_WI32(priv->pramin_bar->gpuobj, 0x10, 0x00000000);
 	BAR0_WI32(priv->pramin_bar->gpuobj, 0x14, 0x00000000);
 
+	/* DMA object for FB BAR */
+	if ((ret = nouveau_gpuobj_new_ref(dev, chan, chan, 0, 6*4, 16, 0,
+					  &priv->fb_bar)))
+		return ret;
+	BAR0_WI32(priv->fb_bar->gpuobj, 0x00, 0x7fc00000);
+	BAR0_WI32(priv->fb_bar->gpuobj, 0x04, 0x40000000 +
+					      drm_get_resource_len(dev, 1) - 1);
+	BAR0_WI32(priv->fb_bar->gpuobj, 0x08, 0x40000000);
+	BAR0_WI32(priv->fb_bar->gpuobj, 0x0c, 0x00000000);
+	BAR0_WI32(priv->fb_bar->gpuobj, 0x10, 0x00000000);
+	BAR0_WI32(priv->fb_bar->gpuobj, 0x14, 0x00000000);
+
 	/* Poke the relevant regs, and pray it works :) */
 	nv_wr32(NV50_PUNK_BAR_CFG_BASE, (chan->ramin->instance >> 12));
 	nv_wr32(NV50_PUNK_UNK1710, 0);
 	nv_wr32(NV50_PUNK_BAR_CFG_BASE, (chan->ramin->instance >> 12) |
 					 NV50_PUNK_BAR_CFG_BASE_VALID);
-	nv_wr32(NV50_PUNK_BAR1_CTXDMA, 0);
+	nv_wr32(NV50_PUNK_BAR1_CTXDMA, (priv->fb_bar->instance >> 4) |
+					NV50_PUNK_BAR1_CTXDMA_VALID);
 	nv_wr32(NV50_PUNK_BAR3_CTXDMA, (priv->pramin_bar->instance >> 4) |
 					NV50_PUNK_BAR3_CTXDMA_VALID);
 
@@ -270,6 +284,7 @@ nv50_instmem_takedown(struct drm_device *dev)
 	for (i = 0x1700; i <= 0x1710; i+=4)
 		nv_wr32(i, priv->save1700[(i-0x1700)/4]);
 
+	nouveau_gpuobj_ref_del(dev, &priv->fb_bar);
 	nouveau_gpuobj_ref_del(dev, &priv->pramin_bar);
 	nouveau_gpuobj_ref_del(dev, &priv->pramin_pt);
 
