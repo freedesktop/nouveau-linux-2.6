@@ -66,31 +66,24 @@ nouveau_sgdma_bind(struct ttm_backend *be, struct ttm_mem_reg *mem)
 	struct drm_device *dev = nvbe->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_gpuobj *gpuobj = dev_priv->gart_info.sg_ctxdma;
-	unsigned i, j, pte, tile = 0;
+	unsigned i, j, pte;
 
 	NV_DEBUG(dev, "pg=0x%lx\n", mem->mm_node->start);
-
-#if 0
-	if (mem->proposed_flags & DRM_NOUVEAU_BO_FLAG_TILE &&
-	    mem->proposed_flags & DRM_NOUVEAU_BO_FLAG_ZTILE)
-		tile = 0x2800;
-	else
-	if (mem->proposed_flags & DRM_NOUVEAU_BO_FLAG_TILE)
-		tile = 0x7000;
-#endif
 
 	dev_priv->engine.instmem.prepare_access(nvbe->dev, true);
 	pte = nouveau_sgdma_pte(nvbe->dev, mem->mm_node->start << PAGE_SHIFT);
 	nvbe->pte_start = pte;
 	for (i = 0; i < nvbe->nr_pages; i++) {
 		dma_addr_t dma_offset = page_to_phys(nvbe->pages[i]);
+		uint32_t offset_l = lower_32_bits(dma_offset);
+		uint32_t offset_h = upper_32_bits(dma_offset);
 
 		for (j = 0; j < PAGE_SIZE / NV_CTXDMA_PAGE_SIZE; j++) {
 			if (dev_priv->card_type < NV_50)
-				INSTANCE_WR(gpuobj, pte++, dma_offset | 3);
+				INSTANCE_WR(gpuobj, pte++, offset_l | 3);
 			else {
-				INSTANCE_WR(gpuobj, pte++, dma_offset | 0x21);
-				INSTANCE_WR(gpuobj, pte++, tile);
+				INSTANCE_WR(gpuobj, pte++, offset_l | 0x21);
+				INSTANCE_WR(gpuobj, pte++, offset_h & 0xff);
 			}
 
 			dma_offset += NV_CTXDMA_PAGE_SIZE;
