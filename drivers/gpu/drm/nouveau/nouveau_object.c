@@ -695,6 +695,7 @@ nouveau_gpuobj_dma_new(struct nouveau_channel *chan, int class,
 		INSTANCE_WR(*gpuobj, 2, frame | pte_flags);
 		INSTANCE_WR(*gpuobj, 3, frame | pte_flags);
 	} else {
+		uint64_t limit = offset + size - 1;
 		uint32_t flags0, flags5;
 
 		if (target == NV_DMA_TARGET_VIDMEM) {
@@ -706,8 +707,10 @@ nouveau_gpuobj_dma_new(struct nouveau_channel *chan, int class,
 		}
 
 		INSTANCE_WR(*gpuobj, 0, flags0 | class);
-		INSTANCE_WR(*gpuobj, 1, offset + size - 1);
-		INSTANCE_WR(*gpuobj, 2, offset);
+		INSTANCE_WR(*gpuobj, 1, lower_32_bits(limit));
+		INSTANCE_WR(*gpuobj, 2, lower_32_bits(offset));
+		INSTANCE_WR(*gpuobj, 3, ((upper_32_bits(limit) & 0xff) << 24) |
+					(upper_32_bits(offset) & 0xff));
 		INSTANCE_WR(*gpuobj, 5, flags5);
 	}
 
