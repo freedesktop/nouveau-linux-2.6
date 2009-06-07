@@ -948,8 +948,10 @@ nouveau_gpuobj_channel_init(struct nouveau_channel *chan,
 		vm_offset = (dev_priv->chipset & 0xf0) == 0x50 ? 0x1400 : 0x200;
 		vm_offset += chan->ramin->gpuobj->im_pramin->start;
 		if ((ret = nouveau_gpuobj_new_fake(dev, vm_offset, ~0, 0x4000,
-						   0, &chan->vm_pd, NULL)))
+						   0, &chan->vm_pd, NULL))) {
+			instmem->finish_access(dev);
 			return ret;
+		}
 		for (i=0; i<0x4000; i+=8) {
 			INSTANCE_WR(chan->vm_pd, (i+0)/4, 0x00000000);
 			INSTANCE_WR(chan->vm_pd, (i+4)/4, 0xdeadcafe);
