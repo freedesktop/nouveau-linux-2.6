@@ -239,9 +239,11 @@ nv50_mem_vm_bind_linear(struct drm_device *dev, uint64_t virt, uint32_t size,
 		while (pages--) {
 			struct nouveau_gpuobj *pt = pgt[virt >> 29];
 			unsigned pte = ((virt & 0x1fffffffULL) >> psz) << 1;
+			unsigned offset_h = upper_32_bits(phys) & 0xff;
+			unsigned offset_l = lower_32_bits(phys);
 
-			INSTANCE_WR(pt, pte++, phys | pfl);
-			INSTANCE_WR(pt, pte++, flags);
+			INSTANCE_WR(pt, pte++, offset_l | pfl);
+			INSTANCE_WR(pt, pte++, offset_h | flags);
 
 			phys += (1 << psz);
 			virt += (1 << psz);
