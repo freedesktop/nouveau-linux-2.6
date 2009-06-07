@@ -231,6 +231,7 @@ nv50_instmem_init(struct drm_device *dev)
 	for (i = 0; i < c_size; i+=4) {
 		if (nv_rd32(NV_RAMIN + i) != nv_ri32(i)) {
 			NV_ERROR(dev, "Error reading back PRAMIN at 0x%08x\n", i);
+			dev_priv->engine.instmem.finish_access(dev);
 			return -EINVAL;
 		}
 	}
