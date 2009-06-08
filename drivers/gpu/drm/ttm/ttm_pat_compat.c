@@ -53,6 +53,8 @@
 #define _PAGE_PAT 0x080
 #endif
 
+#include "../drm_compat.h"
+
 static int ttm_has_pat = 0;
 
 /*

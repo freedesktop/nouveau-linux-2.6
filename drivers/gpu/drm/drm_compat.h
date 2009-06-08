@@ -35,6 +35,7 @@
 #define _DRM_COMPAT_H_
 
 #include <linux/version.h>
+#include <linux/io.h>
 
 #ifndef minor
 #define minor(x) MINOR((x))
@@ -227,6 +228,7 @@ static inline void set_page_locked(struct page *page)
 #endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,25))
+struct agp_bridge_data;
 static inline void agp_flush_chipset(struct agp_bridge_data *bridge)
 {
 	/* This should break only Intel stuff. */
@@ -242,6 +244,24 @@ static inline int set_memory_uc(unsigned long addr, int numpages)
 static inline int set_memory_wb(unsigned long addr, int numpages)
 {
 	(void)addr, (void)numpages;
+	return 0;
+}
+
+static inline int set_memory_wc(unsigned long addr, int numpages)
+{
+	(void)addr, (void)numpages;
+	return 0;
+}
+
+static inline int set_pages_uc(struct page *page, int numpages)
+{
+	(void)page, (void)numpages;
+	return 0;
+}
+
+static inline int set_pages_wb(struct page *page, int numpages)
+{
+	(void)page, (void)numpages;
 	return 0;
 }
 #endif
@@ -279,6 +299,21 @@ void pci_disable_rom(struct pci_dev *pdev);
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28))
 #ifndef pgprot_writecombine
 #define pgprot_writecombine pgprot_noncached
+#endif
+#endif
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,26))
+#ifndef CONFIG_SMP
+#undef on_each_cpu
+#define on_each_cpu(func,info,wait)             \
+        ({                                      \
+                local_irq_disable();            \
+                func(info);                     \
+                local_irq_enable();             \
+                0;                              \
+        })
+#else
+#define on_each_cpu(func, info, wait) on_each_cpu(func, info, 0, wait)
 #endif
 #endif
 

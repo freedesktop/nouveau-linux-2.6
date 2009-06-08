@@ -38,6 +38,7 @@
 #include <linux/wait.h>
 #include <linux/version.h>
 #include <linux/module.h>
+#include "../drm_compat.h"
 
 void ttm_bo_free_old_node(struct ttm_buffer_object *bo)
 {

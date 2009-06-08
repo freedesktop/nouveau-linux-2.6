@@ -32,7 +32,15 @@
 
 #ifndef _TTM_PAT_COMPAT_
 #define _TTM_PAT_COMPAT_
+
+#include <linux/version.h>
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29))
+#include <linux/spinlock.h>
+#include <asm/pgtable.h>
+#else
 #include <asm/pgtable_types.h>
+#endif
 
 extern void ttm_pat_init(void);
 extern void ttm_pat_takedown(void);
