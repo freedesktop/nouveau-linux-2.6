@@ -1,0 +1,61 @@
+Hi.
+
+This kernel tree contains the DRM, TTM and Nouveau modules patched
+to compile with the kernel 2.6.24 and above. Note, that the
+modules may be buggy due to the compatibility patching.
+
+If your kernel is 2.6.27 or earlier, you have to patch it with this:
+
+commit 395e0ddc44005ced5e4fed9bfc2e4bdf63d37627
+Author: Keith Packard <keithp@keithp.com>
+Date:   Fri Jun 20 00:08:06 2008 -0700
+
+diff --git a/mm/shmem.c b/mm/shmem.c
+index bf66d01..d87958a 100644
+--- a/mm/shmem.c
++++ b/mm/shmem.c
+@@ -2580,6 +2580,7 @@ put_memory:
+        shmem_unacct_size(flags, size);
+        return ERR_PTR(error);
+ }
++EXPORT_SYMBOL_GPL(shmem_file_setup);
+
+ /**
+  * shmem_zero_setup - setup a shared anonymous mapping
+
+
+
+
+Building the modules against the currently running kernel:
+
+Make an empty directory somewhere:
+$ mkdir tmppad
+$ cd tmppad
+
+Copy the install script there:
+$ cp path/to/linux-2.6/scripts/mkbuild-nouveau.bash .
+
+Fix the NKDIR path in the script, most likely you have a different path
+than I.
+
+Init the build environment:
+$ ./mkbuild-nouveau.bash init
+If you get error about your kernel configuration, fix it, rebuild and
+reinstall your kernel (or just the missing modules, if that is adequate).
+Then start again with the empty directory.
+
+Build the modules:
+$ ./mkbuild-nouveau.bash build
+
+You can find the freshly built drm.ko, ttm.ko and nouveau.ko in the
+directories under path/to/linux-2.6/drivers/gpu/drm/.
+
+To clean up, you can:
+$ ./mkbuild-nouveau.bash clean
+
+
+Good luck.
+
+
+- Pekka Paalanen <pq@iki.fi>
+
