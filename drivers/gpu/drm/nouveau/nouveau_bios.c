@@ -2910,6 +2910,9 @@ bool nouveau_bios_fp_mode(struct drm_device *dev, struct drm_display_mode *mode)
 	/* bytes 38-39 relate to spread spectrum settings
 	 * bytes 40-43 are something to do with PWM */
 
+	mode->status = MODE_OK;
+	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
+	drm_mode_set_name(mode);
 	return bios->fp.mode_ptr;
 }
 
