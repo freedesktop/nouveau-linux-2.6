@@ -98,7 +98,7 @@ nv50_fbcon_imageblit(struct fb_info *info, const struct fb_image *image)
 	if (info->state != FBINFO_STATE_RUNNING)
 		return;
 
-	if (image->depth != 1 || FBINFO_HWACCEL_DISABLED)
+	if (image->depth != 1 || (info->flags & FBINFO_HWACCEL_DISABLED))
 		return cfb_imageblit(info, image);
 
 	if (RING_SPACE(chan, 11)) {
