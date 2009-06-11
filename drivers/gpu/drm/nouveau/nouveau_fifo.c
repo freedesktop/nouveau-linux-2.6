@@ -482,9 +482,11 @@ void nouveau_fifo_free(struct nouveau_channel *chan)
 		ret = ttm_fence_object_create(&dev_priv->ttm.fdev, chan->id,
 					      TTM_FENCE_TYPE_EXE,
 					      TTM_FENCE_FLAG_EMIT, &fence);
-		if (ret == 0)
+		if (ret == 0) {
 			ret = ttm_fence_object_wait(fence, 0, 1,
 						    TTM_FENCE_TYPE_EXE);
+			ttm_fence_object_unref(&fence);
+		}
 
 		if (ret) {
 			NV_ERROR(dev, "Failed to fence channel %d.  "
