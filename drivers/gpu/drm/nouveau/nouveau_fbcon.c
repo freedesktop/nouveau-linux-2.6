@@ -136,6 +136,12 @@ static int nouveau_fbcon_setcolreg(unsigned regno, unsigned red, unsigned green,
 					((green & 0xfc00) >>  5) |
 					((blue  & 0xf800) >> 11);
 				break;
+			case 30:
+				fb->pseudo_palette[regno] =
+					((blue & 0xffc0) << 14) |
+					((green & 0xffc0) << 4) |
+					((red & 0xffc0) >> 6);
+				break;
 			case 24:
 			case 32:
 				fb->pseudo_palette[regno] = ((red & 0xff00) << 8) |
@@ -169,7 +175,13 @@ static int nouveau_fbcon_check_var(struct fb_var_screeninfo *var,
 		depth = (var->green.length == 6) ? 16 : 15;
 		break;
 	case 32:
-		depth = (var->transp.length > 0) ? 32 : 24;
+		if (var->transp.length == 2)
+			depth = 30;
+		else
+		if (var->transp.length > 0)
+			depth = 32;
+		else
+			depth = 24;
 		break;
 	default:
 		depth = var->bits_per_pixel;
@@ -216,6 +228,16 @@ static int nouveau_fbcon_check_var(struct fb_var_screeninfo *var,
 		var->blue.length = 8;
 		var->transp.length = 0;
 		var->transp.offset = 0;
+		break;
+	case 30:
+		info->var.red.offset = 0;
+		info->var.green.offset = 10;
+		info->var.blue.offset = 20;
+		info->var.red.length = 10;
+		info->var.green.length = 10;
+		info->var.blue.length = 10;
+		info->var.transp.offset = 30;
+		info->var.transp.length = 2;
 		break;
 	case 32:
 		var->red.offset = 16;
@@ -622,6 +644,16 @@ static int nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 		info->var.blue.length = 8;
 		info->var.transp.offset = 0;
 		info->var.transp.length = 0;
+		break;
+	case 30:
+		info->var.red.offset = 0;
+		info->var.green.offset = 10;
+		info->var.blue.offset = 20;
+		info->var.red.length = 10;
+		info->var.green.length = 10;
+		info->var.blue.length = 10;
+		info->var.transp.offset = 30;
+		info->var.transp.length = 2;
 		break;
 	case 32:
 		info->var.red.offset = 16;

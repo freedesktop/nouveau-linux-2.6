@@ -159,7 +159,14 @@ nv50_fbcon_accel_init(struct fb_info *info)
 		format = 0xe8;
 		break;
 	default:
-		format = 0xe6;
+		switch (info->var.transp.length) {
+		case 2:
+			format = 0xd1;
+			break;
+		default:
+			format = 0xe6;
+			break;
+		}
 		break;
 	}
 

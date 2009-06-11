@@ -80,6 +80,12 @@ nv50_crtc_lut_load(struct nouveau_crtc *crtc)
 			writew(crtc->lut.g[i] >> 2, lut + 8*i + 2);
 			writew(crtc->lut.b[i] >> 2, lut + 8*i + 4);
 		}
+
+		if (crtc->lut.depth == 30) {
+			writew(crtc->lut.r[i-1] >> 2, lut + 8*i + 0);
+			writew(crtc->lut.g[i-1] >> 2, lut + 8*i + 2);
+			writew(crtc->lut.b[i-1] >> 2, lut + 8*i + 4);
+		}
 		break;
 	}
 
@@ -547,6 +553,9 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 		break;
 	case 24:
 		OUT_MODE(NV50_CRTC0_DEPTH + offset, NV50_CRTC0_DEPTH_24BPP);
+		break;
+	case 30:
+		OUT_MODE(NV50_CRTC0_DEPTH + offset, NV50_CRTC0_DEPTH_30BPP);
 		break;
 	}
 
