@@ -3168,7 +3168,7 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 		return 1;
 	}
 
-	if (table[0] != 0x20) {
+	if (table[0] != 0x20 && table[0] != 0x21) {
 		NV_ERROR(dev, "Output script table version 0x%02x unknown\n", table[0]);
 		return 1;
 	}
