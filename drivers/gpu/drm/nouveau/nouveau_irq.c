@@ -455,6 +455,12 @@ nv50_pgraph_irq_handler(struct drm_device *dev)
 	status = nv_rd32(NV03_PGRAPH_INTR);
 	nsource = nv_rd32(NV03_PGRAPH_NSOURCE);
 
+	if (status & 0x00000001) {
+		nouveau_pgraph_intr_notify(dev, nsource);
+		status &= ~0x00000001;
+		nv_wr32(NV03_PGRAPH_INTR, 0x00000001);
+	}
+
 	if (status & 0x00000010) {
 		nouveau_pgraph_intr_error(dev,
 					  NV03_PGRAPH_NSOURCE_ILLEGAL_MTHD);
