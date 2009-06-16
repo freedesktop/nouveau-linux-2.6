@@ -29,6 +29,7 @@
 #include "drm_crtc_helper.h"
 #include "nouveau_reg.h"
 #include "nouveau_drv.h"
+#include "nouveau_hw.h"
 #include "nouveau_encoder.h"
 #include "nouveau_crtc.h"
 #include "nouveau_fb.h"
@@ -257,135 +258,28 @@ nv50_crtc_set_scale(struct nouveau_crtc *crtc, int scaling_mode, bool update)
 }
 
 static int
-nv50_crtc_calc_clock(struct nouveau_crtc *crtc, struct drm_display_mode *mode,
-		     uint32_t *bestN1, uint32_t *bestN2, uint32_t *bestM1,
-		     uint32_t *bestM2, uint32_t *bestlog2P)
+nv50_crtc_set_clock(struct nouveau_crtc *crtc, struct drm_display_mode *mode)
 {
+	uint32_t pll_reg = NV50_PDISPLAY_CRTC_CLK_CLK_CTRL1(crtc->index);
 	struct drm_device *dev = crtc->base.dev;
+	struct nouveau_pll_vals pll;
 	struct pll_lims limits;
-	int clk = mode->clock, vco2, crystal;
-	int minvco1, minvco2, minU1, maxU1, minU2, maxU2, minM1, maxM1;
-	int maxvco1, maxvco2, minN1, maxN1, minM2, maxM2, minN2, maxN2;
-	bool fixedgain2;
-	int M1, N1, M2, N2, log2P;
-	int clkP, calcclk1, calcclk2, calcclkout;
-	int delta, bestdelta = INT_MAX;
-	int bestclk = 0;
+	uint32_t reg1, reg2;
 	int ret;
 
-	NV_DEBUG(dev, "\n");
-
-	/* These are in the g80 bios tables, at least in mine. */
-	ret = get_pll_limits(crtc->base.dev,
-			     NV50_PDISPLAY_CRTC_CLK_CLK_CTRL1(crtc->index),
-			     &limits);
+	ret = get_pll_limits(dev, pll_reg, &limits);
 	if (ret)
 		return ret;
 
-	minvco1 = limits.vco1.minfreq, maxvco1 = limits.vco1.maxfreq;
-	minvco2 = limits.vco2.minfreq, maxvco2 = limits.vco2.maxfreq;
-	minU1 = limits.vco1.min_inputfreq, minU2 = limits.vco2.min_inputfreq;
-	maxU1 = limits.vco1.max_inputfreq, maxU2 = limits.vco2.max_inputfreq;
-	minM1 = limits.vco1.min_m, maxM1 = limits.vco1.max_m;
-	minN1 = limits.vco1.min_n, maxN1 = limits.vco1.max_n;
-	minM2 = limits.vco2.min_m, maxM2 = limits.vco2.max_m;
-	minN2 = limits.vco2.min_n, maxN2 = limits.vco2.max_n;
-	crystal = limits.refclk;
-	fixedgain2 = (minM2 == maxM2 && minN2 == maxN2);
+	ret = nouveau_calc_pll_mnp(dev, &limits, mode->clock, &pll);
+	if (ret <= 0)
+		return ret;
 
-	vco2 = (maxvco2 - maxvco2/200) / 2;
-	/* log2P is maximum of 6 */
-	for (log2P = 0; clk && log2P < 6 && clk <= (vco2 >> log2P); log2P++);
-	clkP = clk << log2P;
-
-	if (maxvco2 < clk + clk/200)	/* +0.5% */
-		maxvco2 = clk + clk/200;
-
-	for (M1 = minM1; M1 <= maxM1; M1++) {
-		if (crystal/M1 < minU1)
-			return bestclk;
-		if (crystal/M1 > maxU1)
-			continue;
-
-		for (N1 = minN1; N1 <= maxN1; N1++) {
-			calcclk1 = crystal * N1 / M1;
-			if (calcclk1 < minvco1)
-				continue;
-			if (calcclk1 > maxvco1)
-				break;
-
-			for (M2 = minM2; M2 <= maxM2; M2++) {
-				if (calcclk1/M2 < minU2)
-					break;
-				if (calcclk1/M2 > maxU2)
-					continue;
-
-				/* add calcclk1/2 to round better */
-				N2 = (clkP * M2 + calcclk1/2) / calcclk1;
-				if (N2 < minN2)
-					continue;
-				if (N2 > maxN2)
-					break;
-
-				if (!fixedgain2) {
-					calcclk2 = calcclk1 * N2 / M2;
-					if (calcclk2 < minvco2)
-						break;
-					if (calcclk2 > maxvco2)
-						continue;
-				} else
-					calcclk2 = calcclk1;
-
-				calcclkout = calcclk2 >> log2P;
-				delta = abs(calcclkout - clk);
-				/* we do an exhaustive search rather than
-				 * terminating on an optimality condition...
-				 */
-				if (delta < bestdelta) {
-					bestdelta = delta;
-					bestclk = calcclkout;
-					*bestN1 = N1;
-					*bestN2 = N2;
-					*bestM1 = M1;
-					*bestM2 = M2;
-					*bestlog2P = log2P;
-					if (delta == 0)	/* except this one */
-						return bestclk;
-				}
-			}
-		}
-	}
-
-	return bestclk;
-}
-
-static int
-nv50_crtc_set_clock(struct nouveau_crtc *crtc, struct drm_display_mode *mode)
-{
-	struct drm_device *dev = crtc->base.dev;
-	uint32_t pll_reg = NV50_PDISPLAY_CRTC_CLK_CLK_CTRL1(crtc->index);
-	uint32_t N1 = 0, N2 = 0, M1 = 0, M2 = 0, log2P = 0;
-	uint32_t reg1 = nv_rd32(pll_reg + 4);
-	uint32_t reg2 = nv_rd32(pll_reg + 8);
-
-	NV_DEBUG(dev, "\n");
-
-	nv_wr32(pll_reg, NV50_PDISPLAY_CRTC_CLK_CLK_CTRL1_CONNECTED | 0x10000011);
-
-	/* The other bits are typically empty, but let's be on the safe side. */
-	reg1 &= 0xff00ff00;
-	reg2 &= 0x8000ff00;
-
-	if (!nv50_crtc_calc_clock(crtc, mode, &N1, &N2, &M1, &M2, &log2P))
-		return -EINVAL;
-
-	NV_DEBUG(dev, "N1 %d N2 %d M1 %d M2 %d log2P %d\n", N1, N2, M1, M2, log2P);
-
-	reg1 |= (M1 << 16) | N1;
-	reg2 |= (log2P << 28) | (M2 << 16) | N2;
-
-	nv_wr32(pll_reg + 4, reg1);
-	nv_wr32(pll_reg + 8, reg2);
+	reg1 = nv_rd32(pll_reg + 4) & 0xff00ff00;
+	reg2 = nv_rd32(pll_reg + 8) & 0x8000ff00;
+	nv_wr32(pll_reg, 0x10000611);
+	nv_wr32(pll_reg + 4, reg1 | (pll.M1 << 16) | pll.N1);
+	nv_wr32(pll_reg + 8, reg2 | (pll.log2P << 28) | (pll.M2 << 16) | pll.N2);
 
 	return 0;
 }
