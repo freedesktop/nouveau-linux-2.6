@@ -462,7 +462,7 @@ nv50_pgraph_irq_handler(struct drm_device *dev)
 	}
 
 	if (status & 0x00000010) {
-		nouveau_pgraph_intr_error(dev,
+		nouveau_pgraph_intr_error(dev, nsource |
 					  NV03_PGRAPH_NSOURCE_ILLEGAL_MTHD);
 
 		status &= ~0x00000010;
@@ -470,7 +470,7 @@ nv50_pgraph_irq_handler(struct drm_device *dev)
 	}
 
 	if (status & 0x00100000) {
-		nouveau_pgraph_intr_error(dev,
+		nouveau_pgraph_intr_error(dev, nsource |
 					  NV03_PGRAPH_NSOURCE_DATA_ERROR);
 
 		status &= ~0x00100000;
