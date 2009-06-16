@@ -178,41 +178,64 @@ out:
 	pci_disable_rom(dev->pdev);
 }
 
+struct methods {
+	const char desc[8];
+	void (*loadbios)(struct drm_device *, uint8_t *);
+	const bool rw;
+	int score;
+};
+
+static struct methods nv04_methods[] = {
+	{ "PROM", load_vbios_prom, false },
+	{ "PRAMIN", load_vbios_pramin, true },
+	{ "PCI ROM", load_vbios_pci, true },
+	{ }
+};
+
+static struct methods nv50_methods[] = {
+	{ "PRAMIN", load_vbios_pramin, true },
+	{ "PROM", load_vbios_prom, false },
+	{ "PCI ROM", load_vbios_pci, true },
+	{ }
+};
+
 static bool NVShadowVBIOS(struct drm_device *dev, uint8_t *data)
 {
-	struct methods {
-		const char desc[8];
-		void (*loadbios)(struct drm_device *, uint8_t *);
-		const bool rw;
-		int score;
-	} method[] = {
-		{ "PROM", load_vbios_prom, false },
-		{ "PRAMIN", load_vbios_pramin, true },
-		{ "PCI ROM", load_vbios_pci, true }
-	};
-	int i, testscore = 3;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct methods *methods, *method;
+	int testscore = 3;
 
-	for (i = 0; i < sizeof(method) / sizeof(struct methods); i++) {
+	if (dev_priv->card_type < NV_50)
+		methods = nv04_methods;
+	else
+		methods = nv50_methods;
+
+	method = methods;
+	while (method->loadbios) {
 		NV_TRACE(dev, "Attempting to load BIOS image from %s\n",
-			 method[i].desc);
+			 method->desc);
 		data[0] = data[1] = 0;	/* avoid reuse of previous image */
-		method[i].loadbios(dev, data);
-		method[i].score = score_vbios(dev, data, method[i].rw);
-		if (method[i].score == testscore)
+		method->loadbios(dev, data);
+		method->score = score_vbios(dev, data, method->rw);
+		if (method->score == testscore)
 			return true;
+		method++;
 	}
 
-	while (--testscore > 0)
-		for (i = 0; i < sizeof(method) / sizeof(struct methods); i++)
-			if (method[i].score == testscore) {
+	while (--testscore > 0) {
+		method = methods;
+		while (method->loadbios) {
+			if (method->score == testscore) {
 				NV_TRACE(dev, "Using BIOS image from %s\n",
-					 method[i].desc);
-				method[i].loadbios(dev, data);
+					 method->desc);
+				method->loadbios(dev, data);
 				return true;
 			}
+			method++;
+		}
+	}
 
 	NV_ERROR(dev, "No valid BIOS image found\n");
-
 	return false;
 }
 
