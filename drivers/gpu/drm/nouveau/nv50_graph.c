@@ -242,11 +242,12 @@ nv50_graph_create_context(struct nouveau_channel *chan)
 	}
 
 	INSTANCE_WR(ctx, 0x00000/4, chan->ramin->instance >> 12);
+#if 0
 	if ((dev_priv->chipset & 0xf0) == 0xa0)
 		INSTANCE_WR(ctx, 0x00004/4, 0x00000002);
 	else
 		INSTANCE_WR(ctx, 0x0011c/4, 0x00000002);
-
+#endif
 	dev_priv->engine.instmem.finish_access(dev);
 
 	return 0;
