@@ -23,7 +23,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include <linux/swab.h>
+/*#include <linux/swab.h>*/
 
 #include "drmP.h"
 #include "drm.h"
