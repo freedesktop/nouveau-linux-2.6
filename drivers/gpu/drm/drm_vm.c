@@ -37,6 +37,7 @@
 #if defined(__ia64__)
 #include <linux/efi.h>
 #endif
+#include "drm_compat.h"
 
 static void drm_vm_open(struct vm_area_struct *vma);
 static void drm_vm_close(struct vm_area_struct *vma);
