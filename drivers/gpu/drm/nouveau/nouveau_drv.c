@@ -32,7 +32,7 @@ MODULE_PARM_DESC(noagp, "Disable AGP");
 int nouveau_noagp = 0;
 module_param_named(noagp, nouveau_noagp, int, 0400);
 
-MODULE_PARM_DESC(modeset, "Enable kernel modesetting (>=GeForce 8)");
+MODULE_PARM_DESC(modeset, "Enable kernel modesetting");
 int nouveau_modeset = -1; /* kms */
 module_param_named(modeset, nouveau_modeset, int, 0400);
 
