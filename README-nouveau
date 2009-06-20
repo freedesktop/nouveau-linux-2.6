@@ -1,0 +1,54 @@
+This is a compatibility patched kernel tree for compiling DRM and Nouveau
+for a kernel version 2.6.28 or later.
+
+NOTE: An old kernel may contain bugs that affect your experience.
+An example is I2C, which may fail to retrieve monitor EDID information.
+
+
+There are two ways to build your modules:
+
+
+
+			1. Out-of-tree build
+
+The out-of-tree build should be easy:
+
+$ cd nouveau
+$ make
+$ sudo make install
+
+This will build drm.ko, ttm.ko and nouveau.ko. It is impossible to make
+them built-in this way. You also need to make sure all the kernel config
+dependencies are met. See nouveau/DEPENDS.
+
+If your kernel already provided any of the three modules, make sure only
+the new ones are loaded. The default install path for new modules is
+/lib/modules/`uname -r`/extra/.
+
+
+
+	2. Building the modules as an updated part of your kernel sources
+
+Go into your host kernel tree, and replace two directories with symlinks
+into this new patched kernel tree:
+
+$ cd /usr/src/linux
+
+$ mv include/drm include/drm_orig
+$ ln -s /path/to/nouveau/kernel/include/drm include/drm
+
+$ mv drivers/gpu/drm drivers/gpu/drm_orig
+$ ln -s /path/to/nouveau/kernel/drivers/gpu/drm drivers/gpu/drm
+
+Then reconfigure and build your *host* kernel as usual. You need to
+enable DRM_TTM to get DRM_NOUVEAU. It is recommended to build
+all DRM, DRM_TTM and DRM_NOUVEAU as modules (drm.ko, ttm.ko, nouveau.ko).
+Also make sure you get fbcon.ko (FRAMEBUFFER_CONSOLE) or build it in(?).
+It should be loaded if you 'modprobe nouveau modeset=1', otherwise you
+just get an unusable picture.
+
+$ make oldconfig
+$ make menuconfig
+$ make
+etc.
+

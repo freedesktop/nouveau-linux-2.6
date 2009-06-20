@@ -1,0 +1,78 @@
+# This Makefile is loosely based on the drm.git/linux-core/Makefile and
+# the preliminary work by Christopher James Halse Rogers.
+# Edited by Pekka Paalanen <pq@iki.fi>
+
+# By default, the build is done against the running linux kernel source.
+# To build against a different kernel source tree, set LINUXDIR:
+#
+#    make LINUXDIR=/path/to/kernel/source
+
+# By default, it is assumed the Nouveau kernel tree is found in $PWD/../.
+# To use a different path to the Nouveau kernel tree, set NOUVEAUROOTDIR:
+#
+#    make NOUVEAUROOTDIR=/path/to/nouveau/linux-2.6
+
+
+ifndef LINUXDIR
+RUNNING_REL := $(shell uname -r)
+
+LINUXDIR := $(shell if [ -e /lib/modules/$(RUNNING_REL)/source ]; then \
+		echo /lib/modules/$(RUNNING_REL)/source; \
+		else echo /lib/modules/$(RUNNING_REL)/build; fi)
+endif
+
+NOUVEAUGITREMOTE ?= origin
+NOUVEAUROOTDIR ?= $(CURDIR)/..
+override NOUVEAUROOTDIR := $(abspath $(NOUVEAUROOTDIR))
+
+TESTFILE := include/drm/nouveau_drm.h
+ifeq ($(wildcard $(NOUVEAUROOTDIR)/$(TESTFILE)),)
+$(error $(NOUVEAUROOTDIR) does not look like the right kernel tree, \
+	please set NOUVEAUROOTDIR)
+endif
+
+GIT_REVISION := $(shell GIT_DIR=$(NOUVEAUROOTDIR)/.git \
+	git describe --abbrev=17 2> /dev/null)
+
+DRMINC := -I$(NOUVEAUROOTDIR)/include/drm
+DRMDIR := $(NOUVEAUROOTDIR)/drivers/gpu/drm
+DRMCFG := \
+	CONFIG_DRM=m \
+	CONFIG_DRM_TTM=m \
+	CONFIG_DRM_NOUVEAU=m \
+	CONFIG_DRM_NOUVEAU_KMS=n
+
+MYPARMS := -C $(LINUXDIR) KCPPFLAGS="$(DRMINC)" SUBDIRS="$(DRMDIR)" $(DRMCFG)
+
+ifneq ($(GIT_REVISION),)
+MYPARMS += 'EXTRA_CFLAGS=-D"GIT_REVISION=\"$(GIT_REVISION)\""'
+endif
+
+.PHONY: all modules install clean archive FORCE
+
+all: modules
+FORCE:
+
+modules:
+	$(MAKE) $(MYPARMS) modules
+
+install:
+	$(MAKE) $(MYPARMS) modules_install
+
+clean:
+	$(MAKE) $(MYPARMS) clean
+
+archive: newttm-devel-compat.tar.gz newttm-devel.tar.gz master.tar.gz
+
+newttm-devel-compat.tar.gz: EXTRAS=nouveau README-nouveau
+
+%.tar: FORCE
+	GIT_DIR=$(NOUVEAUROOTDIR)/.git \
+	git archive --format=tar --prefix=$*/ $(NOUVEAUGITREMOTE)/$* \
+		drivers/gpu/drm include/drm $(EXTRAS) > $@
+
+%.tar.gz: %.tar
+	gzip -9 -c $< > $@
+
+# The commit id of the archive can be read with
+# $ zcat foo.tar.gz | git get-tar-commit-id
