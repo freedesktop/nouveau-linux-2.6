@@ -39,8 +39,6 @@
 #include <linux/swap.h>
 #include "ttm/ttm_bo_driver.h"
 #include "ttm/ttm_placement_common.h"
-#include <linux/module.h>
-#include "../drm_compat.h"
 
 static int ttm_tt_swapin(struct ttm_tt *ttm);
 

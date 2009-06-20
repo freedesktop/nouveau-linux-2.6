@@ -30,7 +30,6 @@
  */
 
 #include "drmP.h"
-#include "drm_compat.h"
 #include "drm_crtc.h"
 #include "drm_crtc_helper.h"
 

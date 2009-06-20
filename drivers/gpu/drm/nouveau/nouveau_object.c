@@ -34,7 +34,6 @@
 #include "drm.h"
 #include "nouveau_drv.h"
 #include "nouveau_drm.h"
-#include "../drm_compat.h"
 
 /* NVidia uses context objects to drive drawing operations.
 

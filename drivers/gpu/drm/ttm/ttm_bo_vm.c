@@ -38,7 +38,6 @@
 #include <linux/rbtree.h>
 #include <linux/module.h>
 #include <asm/uaccess.h>
-#include "../drm_compat.h"
 
 #define TTM_BO_VM_NUM_PREFAULT 16
 

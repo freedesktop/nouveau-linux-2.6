@@ -34,7 +34,6 @@
 #include "drm.h"
 #include "drm_sarea.h"
 #include "nouveau_drv.h"
-#include "../drm_compat.h"
 
 extern int nouveau_noagp;
 

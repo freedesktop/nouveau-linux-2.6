@@ -35,7 +35,6 @@
 
 #include <linux/highmem.h>
 #include "drmP.h"
-#include "drm_compat.h"
 
 #ifdef DEBUG_MEMORY
 #include "drm_memory_debug.h"

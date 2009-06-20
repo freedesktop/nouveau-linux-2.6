@@ -34,7 +34,6 @@
 #include "nouveau_drm.h"
 #include "nouveau_drv.h"
 #include "nouveau_dma.h"
-#include "../drm_compat.h"
 
 static struct ttm_backend *
 nouveau_bo_create_ttm_backend_entry(struct ttm_bo_device *bdev)

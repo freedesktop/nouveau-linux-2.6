@@ -18,7 +18,6 @@
 
 #include "drm_core.h"
 #include "drmP.h"
-#include "drm_compat.h"
 
 #define to_drm_minor(d) container_of(d, struct drm_minor, kdev)
 #define to_drm_connector(d) container_of(d, struct drm_connector, kdev)

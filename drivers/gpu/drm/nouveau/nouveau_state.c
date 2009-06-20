@@ -23,12 +23,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include <linux/version.h>
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,27))
-#include <asm/byteorder.h>
-#else
 #include <linux/swab.h>
-#endif
 
 #include "drmP.h"
 #include "drm.h"
