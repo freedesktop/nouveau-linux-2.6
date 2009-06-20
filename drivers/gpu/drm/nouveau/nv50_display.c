@@ -41,7 +41,7 @@ static int nv50_display_pre_init(struct drm_device *dev)
 	NV_DEBUG(dev, "\n");
 
 	ret = nouveau_bo_new(dev, dev_priv->channel, 16384, 0,
-			     TTM_PL_FLAG_VRAM, 0, 0x0000, true, true,
+			     TTM_PL_FLAG_VRAM, 0, 0x0000, false, true,
 			     &evo->ramin);
 	if (ret) {
 		NV_ERROR(dev, "Error allocating EVO channel memory: %d\n", ret);
@@ -86,6 +86,7 @@ static int nv50_display_pre_init(struct drm_device *dev)
 	nv_wr32(0x006101e0 + 0 * 0x4, nv_rd32(0x0061c000 + 0 * 0x800));
 	nv_wr32(0x006101e0 + 1 * 0x4, nv_rd32(0x0061c000 + 1 * 0x800));
 	nv_wr32(0x006101e0 + 2 * 0x4, nv_rd32(0x0061c000 + 2 * 0x800));
+	nv_wr32(0x006101e0 + 3 * 0x4, nv_rd32(0x0061c000 + 3 * 0x800));
 	/* Something not yet in use, tv-out maybe. */
 	nv_wr32(0x006101f0 + 0 * 0x4, nv_rd32(0x0061e000 + 0 * 0x800));
 	nv_wr32(0x006101f0 + 1 * 0x4, nv_rd32(0x0061e000 + 1 * 0x800));

@@ -38,7 +38,7 @@ nouveau_notifier_init_channel(struct nouveau_channel *chan)
 	int ret;
 
 	ret = nouveau_bo_new(dev, NULL, PAGE_SIZE, 0, TTM_PL_FLAG_VRAM,
-			     0, 0x0000, true, true, &ntfy);
+			     0, 0x0000, false, true, &ntfy);
 	if (ret)
 		return ret;
 

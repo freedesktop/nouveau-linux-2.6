@@ -101,17 +101,14 @@ nv04_fbcon_imageblit(struct fb_info *info, const struct fb_image *image)
 	if (info->state != FBINFO_STATE_RUNNING)
 		return;
 
-	if (image->depth != 1) {
-		NV_DEBUG(dev, "image depth fall-back\n");
-		return cfb_imageblit(info, image);
+	if (image->depth != 1 || info->flags & FBINFO_HWACCEL_DISABLED) {
+		cfb_imageblit(info, image);
+		return;
 	}
 
 	if (RING_SPACE(chan, 8)) {
 		NV_ERROR(dev, "GPU lockup - switching to software fbcon\n");
 		info->flags |= FBINFO_HWACCEL_DISABLED;
-	}
-
-	if (info->flags & FBINFO_HWACCEL_DISABLED) {
 		cfb_imageblit(info, image);
 		return;
 	}

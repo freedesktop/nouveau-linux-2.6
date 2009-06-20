@@ -145,6 +145,13 @@ nv50_i2c_setsda(void *data, int state)
 	i2c->data = state;
 }
 
+const uint32_t nv50_i2c_port[] = {
+	0x00e138, 0x00e150, 0x00e168, 0x00e180,
+	0x00e254, 0x00e274, 0x00e764, 0x00e780,
+	0x00e79c, 0x00e7b8
+};
+#define NV50_I2C_PORTS (sizeof(nv50_i2c_port) / sizeof(nv50_i2c_port[0]))
+
 int
 nouveau_i2c_new(struct drm_device *dev, const char *name, unsigned index,
 		struct nouveau_i2c_chan **pi2c)
@@ -157,6 +164,11 @@ nouveau_i2c_new(struct drm_device *dev, const char *name, unsigned index,
 	if (dcbi2c->chan) {
 		*pi2c = dcbi2c->chan;
 		return 0;
+	}
+
+	if (dev_priv->card_type == NV_50 && dcbi2c->read >= NV50_I2C_PORTS) {
+		NV_ERROR(dev, "unknown i2c port %d\n", dcbi2c->read);
+		return -EINVAL;
 	}
 
 	i2c = drm_calloc(1, sizeof(*i2c), DRM_MEM_DRIVER);
@@ -191,16 +203,7 @@ nouveau_i2c_new(struct drm_device *dev, const char *name, unsigned index,
 		i2c->algo.setscl = nv50_i2c_setscl;
 		i2c->algo.getsda = nv50_i2c_getsda;
 		i2c->algo.getscl = nv50_i2c_getscl;
-		/* not 100% convinced this is correct everywhere, but
-		 * the best guess so far..
-		 */
-		if (dcbi2c->read <= 3)
-			i2c->rd = 0xe138 + (dcbi2c->read * 24);
-		else
-		if (dev_priv->chipset < 0x90)
-			i2c->rd = 0xe1e0 + (dcbi2c->read * 24);
-		else
-			i2c->rd = 0xe1d4 + (dcbi2c->read * 32);
+		i2c->rd = nv50_i2c_port[dcbi2c->read];
 		i2c->wr = i2c->rd;
 		break;
 	default:
