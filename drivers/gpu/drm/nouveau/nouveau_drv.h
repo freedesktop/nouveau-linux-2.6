@@ -425,6 +425,8 @@ struct drm_nouveau_private {
 	struct drm_local_map *ramin_map;
 	struct drm_local_map *ramin;
 
+	struct work_struct irq_work;
+
 	struct {
 		struct drm_global_reference mem_global_ref;
 		struct ttm_lock lock;
