@@ -35,17 +35,31 @@ static void
 nv50_cursor_show(struct nouveau_crtc *crtc, bool update)
 {
 	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
+	struct nouveau_channel *evo = &dev_priv->evo.chan;
 	struct drm_device *dev = crtc->base.dev;
 	uint32_t offset = crtc->index * 0x400;
+	int ret;
 
 	NV_DEBUG(dev, "\n");
 
-	if (dev_priv->chipset != 0x50)
-		OUT_MODE(NV84_CRTC0_CURSOR_DMA + offset, NvEvoVRAM);
-	OUT_MODE(NV50_CRTC0_CURSOR_CTRL + offset, NV50_CRTC0_CURSOR_CTRL_SHOW);
+	ret = RING_SPACE(evo, dev_priv->chipset != 0x50 ? 4 : 2);
+	if (ret) {
+		NV_ERROR(dev, "no space while unhiding cursor\n");
+		return;
+	}
+
+	if (dev_priv->chipset != 0x50) {
+		BEGIN_RING(evo, 0, NV84_CRTC0_CURSOR_DMA + offset, 1);
+		OUT_RING  (evo, NvEvoVRAM);
+	}
+	BEGIN_RING(evo, 0, NV50_CRTC0_CURSOR_CTRL + offset, 1);
+	OUT_RING  (evo, NV50_CRTC0_CURSOR_CTRL_SHOW);
 
 	if (update) {
-		OUT_MODE(NV50_UPDATE_DISPLAY, 0);
+		RING_SPACE(evo, 2);
+		BEGIN_RING(evo, 0, NV50_UPDATE_DISPLAY, 1);
+		OUT_RING  (evo, 0);
+		FIRE_RING (evo);
 		crtc->cursor.visible = true;
 	}
 }
@@ -54,18 +68,30 @@ static void
 nv50_cursor_hide(struct nouveau_crtc *crtc, bool update)
 {
 	struct drm_nouveau_private *dev_priv = crtc->base.dev->dev_private;
+	struct nouveau_channel *evo = &dev_priv->evo.chan;
 	struct drm_device *dev = crtc->base.dev;
 	uint32_t offset = crtc->index * 0x400;
+	int ret;
 
 	NV_DEBUG(dev, "\n");
 
-	OUT_MODE(NV50_CRTC0_CURSOR_CTRL + offset, NV50_CRTC0_CURSOR_CTRL_HIDE);
-	if (dev_priv->chipset != 0x50)
-		OUT_MODE(NV84_CRTC0_CURSOR_DMA + offset,
-			 NV84_CRTC0_CURSOR_DMA_DISABLE);
+	ret = RING_SPACE(evo, dev_priv->chipset != 0x50 ? 4 : 2);
+	if (ret) {
+		NV_ERROR(dev, "no space while hiding cursor\n");
+		return;
+	}
+	BEGIN_RING(evo, 0, NV50_CRTC0_CURSOR_CTRL + offset, 1);
+	OUT_RING  (evo, NV50_CRTC0_CURSOR_CTRL_HIDE);
+	if (dev_priv->chipset != 0x50) {
+		BEGIN_RING(evo, 0, NV84_CRTC0_CURSOR_DMA + offset, 1);
+		OUT_RING  (evo, NV84_CRTC0_CURSOR_DMA_DISABLE);
+	}
 
 	if (update) {
-		OUT_MODE(NV50_UPDATE_DISPLAY, 0);
+		RING_SPACE(evo, 2);
+		BEGIN_RING(evo, 0, NV50_UPDATE_DISPLAY, 1);
+		OUT_RING  (evo, 0);
+		FIRE_RING (evo);
 		crtc->cursor.visible = false;
 	}
 }
@@ -85,10 +111,17 @@ static void
 nv50_cursor_set_offset(struct nouveau_crtc *crtc, uint32_t offset)
 {
 	struct drm_device *dev = crtc->base.dev;
+	int ret;
 
 	NV_DEBUG(dev, "\n");
 
-	OUT_MODE(NV50_CRTC0_CURSOR_OFFSET + crtc->index * 0x0400, offset >> 8);
+	ret = RING_SPACE(evo, 2);
+	if (ret) {
+		NV_ERROR(dev, "no space while setting cursor image\n");
+		return;
+	}
+	BEGIN_RING(evo, 0, NV50_CRTC0_CURSOR_OFFSET + crtc->index * 0x400, 1);
+	OUT_RING  (evo, offset >> 8);
 }
 
 int
