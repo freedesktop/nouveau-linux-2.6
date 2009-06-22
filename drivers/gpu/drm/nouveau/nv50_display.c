@@ -254,6 +254,7 @@ nv50_display_init(struct drm_device *dev)
 
 static int nv50_display_disable(struct drm_device *dev)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_crtc *drm_crtc;
 	int i;
 
@@ -265,7 +266,10 @@ static int nv50_display_disable(struct drm_device *dev)
 		nv50_crtc_blank(crtc, true);
 	}
 
-	OUT_MODE(NV50_UPDATE_DISPLAY, 0);
+	RING_SPACE(&dev_priv->evo.chan, 2);
+	BEGIN_RING(&dev_priv->evo.chan, 0, NV50_UPDATE_DISPLAY, 1);
+	OUT_RING  (&dev_priv->evo.chan, 0);
+	FIRE_RING (&dev_priv->evo.chan);
 
 	/* Almost like ack'ing a vblank interrupt, maybe in the spirit of cleaning up? */
 	list_for_each_entry(drm_crtc, &dev->mode_config.crtc_list, head) {
