@@ -298,14 +298,13 @@ struct nouveau_engine {
 };
 
 struct nv50_evo_channel {
+	struct nouveau_channel chan;
 	struct nouveau_bo *ramin;
 	uint32_t *data;
 	uint32_t offset;
 	uint32_t hashtab;
 	uint32_t pushbuf;
 	uint32_t objects;
-	uint32_t max;
-	uint32_t put;
 };
 
 struct nouveau_pll_vals {

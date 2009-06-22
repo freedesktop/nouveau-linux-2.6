@@ -58,12 +58,33 @@ static int nv50_display_pre_init(struct drm_device *dev)
 	evo->data = evo->ramin->kmap.virtual;
 	for (i = 0; i < 16384/4; i++)
 		evo->data[i] = 0;
-	evo->put = 0;
-	evo->max = 4096 / 4;
 	evo->offset  = evo->ramin->bo.mem.mm_node->start << PAGE_SHIFT;
 	evo->hashtab = 0;
 	evo->objects = evo->hashtab + 4096;
 	evo->pushbuf = evo->objects + 4096;
+
+	/* Setup enough of a "normal" channel to be able to use PFIFO
+	 * DMA routines.
+	 */
+	ret = drm_addmap(dev, drm_get_resource_start(dev, 0) + 
+			 NV50_PDISPLAY_USER(0), PAGE_SIZE, _DRM_REGISTERS,
+			 _DRM_DRIVER | _DRM_READ_ONLY, &evo->chan.user);
+	if (ret) {
+		NV_ERROR(dev, "Error mapping EVO control regs: %d\n", ret);
+		nouveau_bo_ref(NULL, &evo->ramin);
+		return ret;
+	}
+	evo->chan.user_put = 0;
+	evo->chan.user_get = 4;
+	evo->chan.dma.max = (4096 /4) - 2;
+	evo->chan.dma.put = 0;
+	evo->chan.dma.cur = evo->chan.dma.put;
+	evo->chan.dma.free = evo->chan.dma.max - evo->chan.dma.cur;
+	evo->chan.dma.pushbuf = evo->ramin->kmap.virtual + evo->pushbuf;
+
+	RING_SPACE(&evo->chan, NOUVEAU_DMA_SKIPS);
+	for (i = 0; i < NOUVEAU_DMA_SKIPS; i++)
+		OUT_RING  (&evo->chan, 0);
 
 	nv_wr32(0x00610184, nv_rd32(0x00614004));
 	/*
@@ -397,6 +418,11 @@ int nv50_display_destroy(struct drm_device *dev)
 	if (dev_priv->evo.ramin && dev_priv->evo.ramin->kmap.virtual)
 		nouveau_bo_unmap(dev_priv->evo.ramin);
 	nouveau_bo_ref(NULL, &dev_priv->evo.ramin);
+	
+	if (dev_priv->evo.chan.user) {
+		drm_rmmap(dev, dev_priv->evo.chan.user);
+		dev_priv->evo.chan.user = NULL;
+	}
 
 	drm_mode_config_cleanup(dev);
 
@@ -486,14 +512,10 @@ void nv50_display_kickoff(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nv50_evo_channel *evo = &dev_priv->evo;
-	volatile uint32_t tmp = evo->data[0]; (void)tmp;
 
-	NV_DEBUG(dev, "kick 0x%08x\n", evo->put << 2);
+	NV_DEBUG(dev, "kick 0x%08x\n", evo->chan.dma.put << 2);
 
-	nv_wr32(NV50_PDISPLAY_USER_PUT(0), evo->put << 2);
-	if (!nv_wait(NV50_PDISPLAY_USER_GET(0), 0xffffffff, evo->put << 2))
-		NV_ERROR(dev, "display fifo hung :(\n");
-	NV_DEBUG(dev, "post 0x%08x\n", nv_rd32(NV50_PDISPLAY_CHANNEL_STAT(0)));
+	FIRE_RING(&evo->chan);
 }
 
 void nv50_display_command(struct drm_device *dev, uint32_t mthd, uint32_t data)
@@ -503,15 +525,15 @@ void nv50_display_command(struct drm_device *dev, uint32_t mthd, uint32_t data)
 
 	NV_DEBUG(dev, "mthd 0x%03X val 0x%08X\n", mthd, data);
 
-	evo->data[evo->pushbuf/4 + evo->put++] = 0x00040000 | mthd;
-	evo->data[evo->pushbuf/4 + evo->put++] = data;
-	if (evo->put == evo->max - 2) {
-		evo->data[evo->pushbuf/4 + evo->put++] = 0x20000000;
-		evo->put = 0;
+	if (RING_SPACE(&evo->chan, 2)) {
+		NV_ERROR(dev, "display channel stalled\n");
+		return;
 	}
+	OUT_RING(&evo->chan, 0x00040000 | mthd);
+	OUT_RING(&evo->chan, data);
 
 	/* kickoff */
-	if (mthd == 0x80 || evo->put == 0)
+	if (mthd == 0x80)
 		nv50_display_kickoff(dev);
 }
 
