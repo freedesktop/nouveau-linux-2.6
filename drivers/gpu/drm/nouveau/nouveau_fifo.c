@@ -314,6 +314,8 @@ nouveau_fifo_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 		nouveau_fifo_free(chan);
 		return ret;
 	}
+	chan->user_put = 0x40;
+	chan->user_get = 0x44;
 
 	/* Allocate space for per-channel fixed notifier memory */
 	ret = nouveau_notifier_init_channel(chan);
@@ -365,8 +367,8 @@ nouveau_fifo_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	/* setup channel's default get/put values
 	 * XXX: quite possibly extremely pointless..
 	 */
-	nvchan_wr32(0x44, chan->pushbuf_base);
-	nvchan_wr32(0x40, chan->pushbuf_base);
+	nvchan_wr32(chan->user_get, chan->pushbuf_base);
+	nvchan_wr32(chan->user_put, chan->pushbuf_base);
 
 	/* If this is the first channel, setup PFIFO ourselves.  For any
 	 * other case, the GPU will handle this when it switches contexts.

@@ -99,8 +99,15 @@ BEGIN_RING(struct nouveau_channel *chan, int subc, int mthd, int size)
 	OUT_RING(chan, (subc << 13) | (size << 18) | mthd);
 }
 
-#define READ_GET() ((nvchan_rd32(0x44) - chan->pushbuf_base) >> 2)
-#define WRITE_PUT(val) nvchan_wr32(0x40, ((val) << 2) + chan->pushbuf_base)
+#define READ_GET() ((nvchan_rd32(chan->user_get) - chan->pushbuf_base) >> 2)
+
+#define WRITE_PUT(val) do {                                                    \
+	volatile uint32_t tmp;                                                 \
+	DRM_MEMORYBARRIER();                                                   \
+	tmp = chan->dma.pushbuf[0];                                            \
+	nvchan_wr32(chan->user_put, ((val) << 2) + chan->pushbuf_base);        \
+	chan->dma.put = (val);                                                 \
+} while (0)
 
 static inline void
 FIRE_RING(struct nouveau_channel *chan)
@@ -109,9 +116,7 @@ FIRE_RING(struct nouveau_channel *chan)
 		return;
 	chan->accel_done = true;
 
-	DRM_MEMORYBARRIER();
-	chan->dma.put = chan->dma.cur;
-	WRITE_PUT(chan->dma.put);
+	WRITE_PUT(chan->dma.cur);
 }
 
 static inline void

@@ -165,8 +165,11 @@ struct nouveau_channel
 	struct drm_file *file_priv;
 	/* mapping of the fifo itself */
 	struct drm_local_map *map;
+
 	/* mapping of the regs controling the fifo */
 	struct drm_local_map *user;
+	uint32_t user_get;
+	uint32_t user_put;
 
 	/* Fencing */
 	uint32_t next_sequence;
