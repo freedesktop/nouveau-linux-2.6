@@ -35,8 +35,6 @@
 #include "nouveau_crtc.h"
 #include "nv50_display_commands.h"
 
-void nv50_display_command(struct drm_device *dev, uint32_t mthd, uint32_t val);
-void nv50_display_kickoff(struct drm_device *dev);
 void nv50_display_irq_handler(struct drm_device *dev);
 int nv50_display_create(struct drm_device *dev);
 int nv50_display_destroy(struct drm_device *dev);

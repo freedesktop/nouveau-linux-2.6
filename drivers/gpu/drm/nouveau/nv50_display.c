@@ -517,32 +517,3 @@ nv50_display_irq_handler(struct drm_device *dev)
 	}
 }
 
-void nv50_display_kickoff(struct drm_device *dev)
-{
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nv50_evo_channel *evo = &dev_priv->evo;
-
-	NV_DEBUG(dev, "kick 0x%08x\n", evo->chan.dma.put << 2);
-
-	FIRE_RING(&evo->chan);
-}
-
-void nv50_display_command(struct drm_device *dev, uint32_t mthd, uint32_t data)
-{
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nv50_evo_channel *evo = &dev_priv->evo;
-
-	NV_DEBUG(dev, "mthd 0x%03X val 0x%08X\n", mthd, data);
-
-	if (RING_SPACE(&evo->chan, 2)) {
-		NV_ERROR(dev, "display channel stalled\n");
-		return;
-	}
-	OUT_RING(&evo->chan, 0x00040000 | mthd);
-	OUT_RING(&evo->chan, data);
-
-	/* kickoff */
-	if (mthd == 0x80)
-		nv50_display_kickoff(dev);
-}
-
