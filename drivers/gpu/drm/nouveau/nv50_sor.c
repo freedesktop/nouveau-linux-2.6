@@ -42,11 +42,20 @@ static void
 nv50_sor_disconnect(struct nouveau_encoder *encoder)
 {
 	struct drm_device *dev = encoder->base.dev;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_channel *evo = &dev_priv->evo.chan;
 	uint32_t offset = encoder->or * 0x40;
+	int ret;
 
 	NV_DEBUG(dev, "Disconnecting SOR %d\n", encoder->or);
 
-	OUT_MODE(NV50_SOR0_MODE_CTRL + offset, NV50_SOR_MODE_CTRL_OFF);
+	ret = RING_SPACE(evo, 2);
+	if (ret) {
+		NV_ERROR(dev, "no space while disconnecting SOR\n");
+		return;
+	}
+	BEGIN_RING(evo, 0, NV50_SOR0_MODE_CTRL + offset, 1);
+	OUT_RING  (evo, NV50_SOR_MODE_CTRL_OFF);
 }
 
 static int
@@ -180,11 +189,14 @@ static void nv50_sor_mode_set(struct drm_encoder *drm_encoder,
 			      struct drm_display_mode *mode,
 			      struct drm_display_mode *adjusted_mode)
 {
+	struct drm_nouveau_private *dev_priv = drm_encoder->dev->dev_private;
+	struct nouveau_channel *evo = &dev_priv->evo.chan;
 	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
 	struct drm_device *dev = drm_encoder->dev;
 	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_encoder->crtc);
 	uint32_t offset = encoder->or * 0x40;
 	uint32_t mode_ctl = NV50_SOR_MODE_CTRL_OFF;
+	int ret;
 
 	NV_DEBUG(dev, "or %d\n", encoder->or);
 
@@ -207,7 +219,13 @@ static void nv50_sor_mode_set(struct drm_encoder *drm_encoder,
 	if (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC)
 		mode_ctl |= NV50_SOR_MODE_CTRL_NVSYNC;
 
-	OUT_MODE(NV50_SOR0_MODE_CTRL + offset, mode_ctl);
+	ret = RING_SPACE(evo, 2);
+	if (ret) {
+		NV_ERROR(dev, "no space while connecting SOR\n");
+		return;
+	}
+	BEGIN_RING(evo, 0, NV50_SOR0_MODE_CTRL + offset, 1);
+	OUT_RING  (evo, mode_ctl);
 }
 
 static const struct drm_encoder_helper_funcs nv50_sor_helper_funcs = {
