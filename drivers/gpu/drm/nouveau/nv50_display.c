@@ -227,14 +227,19 @@ nv50_display_init(struct drm_device *dev)
 		NV50_PDISPLAY_CHANNEL_STAT_DMA_ENABLED);
 	nv_wr32(0x610300, nv_rd32(0x610300) & ~1);
 
-	/* For the moment this is just a wrapper, which should be replaced with a real fifo at some point. */
-	OUT_MODE (NV50_UNK84, 0);
-	OUT_MODE (NV50_UNK88, 0);
-	OUT_MODE (NV50_CRTC0_BLANK_CTRL, NV50_CRTC0_BLANK_CTRL_BLANK);
-	OUT_MODE (NV50_CRTC0_UNK800, 0);
-	OUT_MODE (NV50_CRTC0_DISPLAY_START, 0);
-	OUT_MODE (NV50_CRTC0_UNK82C, 0);
-	FIRE_MODE();
+	RING_SPACE(&evo->chan, 11);
+	BEGIN_RING(&evo->chan, 0, NV50_UNK84, 2);
+	OUT_RING  (&evo->chan, 0x00000000);
+	OUT_RING  (&evo->chan, 0x00000000);
+	BEGIN_RING(&evo->chan, 0, NV50_CRTC0_BLANK_CTRL, 1);
+	OUT_RING  (&evo->chan, NV50_CRTC0_BLANK_CTRL_BLANK);
+	BEGIN_RING(&evo->chan, 0, NV50_CRTC0_UNK800, 1);
+	OUT_RING  (&evo->chan, 0);
+	BEGIN_RING(&evo->chan, 0, NV50_CRTC0_DISPLAY_START, 1);
+	OUT_RING  (&evo->chan, 0);
+	BEGIN_RING(&evo->chan, 0, NV50_CRTC0_UNK82C, 1);
+	OUT_RING  (&evo->chan, 0);
+	FIRE_RING (&evo->chan);
 
 	/* enable clock change interrupts. */
 	nv_wr32(NV50_PDISPLAY_SUPERVISOR_INTR, 0x70);
