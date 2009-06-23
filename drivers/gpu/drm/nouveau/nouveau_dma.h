@@ -90,6 +90,10 @@ RING_SPACE(struct nouveau_channel *chan, int size)
 static inline void
 OUT_RING(struct nouveau_channel *chan, int data)
 {
+#ifdef NOUVEAU_DMA_DEBUG
+	NV_INFO(chan->dev, "Ch%d/0x%08x: 0x%08x\n",
+		chan->id, chan->dma.cur << 2, data);
+#endif
 	chan->dma.pushbuf[chan->dma.cur++] = data;
 }
 
@@ -112,6 +116,10 @@ BEGIN_RING(struct nouveau_channel *chan, int subc, int mthd, int size)
 static inline void
 FIRE_RING(struct nouveau_channel *chan)
 {
+#ifdef NOUVEAU_DMA_DEBUG
+	NV_INFO(chan->dev, "Ch%d/0x%08x: PUSH!\n",
+		chan->id, chan->dma.cur << 2);
+#endif
 	if (chan->dma.cur == chan->dma.put)
 		return;
 	chan->accel_done = true;

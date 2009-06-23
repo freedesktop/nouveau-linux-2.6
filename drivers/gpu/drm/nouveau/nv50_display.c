@@ -74,6 +74,8 @@ static int nv50_display_pre_init(struct drm_device *dev)
 		nouveau_bo_ref(NULL, &evo->ramin);
 		return ret;
 	}
+	evo->chan.dev = dev;
+	evo->chan.id = -1;
 	evo->chan.user_put = 0;
 	evo->chan.user_get = 4;
 	evo->chan.dma.max = (4096 /4) - 2;
