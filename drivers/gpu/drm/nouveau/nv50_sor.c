@@ -36,7 +36,6 @@
 #include "nv50_display_commands.h"
 
 extern int nouveau_duallink;
-extern int nouveau_uscript;
 
 static void
 nv50_sor_disconnect(struct nouveau_encoder *encoder)
@@ -64,27 +63,12 @@ nv50_sor_set_clock_mode(struct nouveau_encoder *encoder,
 {
 	struct drm_device *dev = encoder->base.dev;
 	uint32_t limit = encoder->dcb->type == OUTPUT_LVDS ? 112000 : 165000;
-	int ret;
 
 	NV_DEBUG(dev, "or %d\n", encoder->or);
 
 	/* We don't yet know what to do, if anything at all. */
-	if (!nouveau_uscript && encoder->dcb->type == OUTPUT_LVDS)
+	if (encoder->dcb->type == OUTPUT_LVDS)
 		return 0;
-
-	if (nouveau_uscript) {
-		NV_TRACE(dev, "executing display table for %d %d %d %d\n",
-			 encoder->dcb->type, encoder->dcb->location,
-			 encoder->dcb->or, mode->clock);
-		ret = nouveau_bios_run_display_table(dev, encoder->dcb,
-						     mode->clock);
-		if (!ret) {
-			ret = nouveau_bios_run_display_table(dev, encoder->dcb,
-							     -mode->clock);
-		}
-		if (ret)
-			NV_ERROR(dev, "error running display table, may hang\n");
-	}
 
 	/* 0x70000 was a late addition to nv, mentioned as fixing tmds
 	 * initialisation on certain gpu's. I presume it's some kind of
@@ -204,6 +188,11 @@ static void nv50_sor_mode_set(struct drm_encoder *drm_encoder,
 	int ret;
 
 	NV_DEBUG(dev, "or %d\n", encoder->or);
+
+	ret = dev_priv->in_modeset;
+	dev_priv->in_modeset = false;
+	nv50_sor_dpms(drm_encoder, DRM_MODE_DPMS_ON);
+	dev_priv->in_modeset = ret;
 
 	if (encoder->base.encoder_type == DRM_MODE_ENCODER_LVDS) {
 		mode_ctl |= NV50_SOR_MODE_CTRL_LVDS;

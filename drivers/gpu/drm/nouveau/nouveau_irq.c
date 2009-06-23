@@ -41,6 +41,8 @@
 #include "nouveau_connector.h"
 #include "nv50_display.h"
 
+extern int nouveau_uscript;
+
 static void
 nv50_irq_work_handler(struct work_struct *work)
 {
@@ -57,8 +59,12 @@ nv50_irq_work_handler(struct work_struct *work)
 		if (!status)
 			break;
 
-		if (status & NV_PMC_INTR_0_NV50_DISPLAY_PENDING)
-			nv50_display_irq_handler(dev);
+		if (status & NV_PMC_INTR_0_NV50_DISPLAY_PENDING) {
+			if (nouveau_uscript == 1)
+				nv50_display_irq_handler(dev);
+			else
+				nv50_display_irq_handler_old(dev);
+		}
 
 		if (status & NV_PMC_INTR_0_NV50_I2C_PENDING) {
 			NV_DEBUG(dev, "HOTPLUG_CTRL: 0x%08x\n",

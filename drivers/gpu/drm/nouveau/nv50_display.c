@@ -496,7 +496,7 @@ static void nv50_display_vclk_update(struct drm_device *dev)
 }
 
 void
-nv50_display_irq_handler(struct drm_device *dev)
+nv50_display_irq_handler_old(struct drm_device *dev)
 {
 	uint32_t super = nv_rd32(NV50_PDISPLAY_SUPERVISOR);
 	uint32_t state;
@@ -519,3 +519,116 @@ nv50_display_irq_handler(struct drm_device *dev)
 	}
 }
 
+static int
+nv50_crtc_encoder_from_610030(struct drm_device *dev,
+                              struct nouveau_crtc **pcrtc,
+                              struct nouveau_encoder **pencoder)
+{
+	struct drm_encoder *drm_encoder;
+	struct nouveau_encoder *encoder;
+	struct drm_crtc *drm_crtc;
+	struct nouveau_crtc *crtc;
+	uint32_t unk30 = nv_rd32(0x610030);
+	int mask = (unk30 >> 9) & 3;
+
+	*pcrtc = NULL;
+	*pencoder = NULL;
+
+	list_for_each_entry(drm_crtc, &dev->mode_config.crtc_list, head) {
+		crtc = to_nouveau_crtc(drm_crtc);
+		if (mask & (1 << crtc->index))
+			break;
+	}
+
+	if (!(mask & (1 << crtc->index)))
+		return -EINVAL;
+
+	list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
+		encoder = to_nouveau_encoder(drm_encoder);
+		if (drm_encoder->crtc == drm_crtc)
+			break;
+	}
+
+	if (drm_encoder->crtc != drm_crtc)
+		return -EINVAL;
+
+	*pcrtc = crtc;
+	*pencoder = encoder;
+	return 0;
+}
+
+void
+nv50_display_irq_handler(struct drm_device *dev)
+{
+	static struct nouveau_encoder *encoder = NULL;
+	static struct nouveau_crtc *crtc = NULL;
+	uint32_t intr, tmp;
+	int ret;
+
+	for (;;) {
+		uint32_t unk20 = nv_rd32(0x610020);
+		intr = nv_rd32(0x610024);
+		if (!intr)
+			break;
+
+		ret = nv50_crtc_encoder_from_610030(dev, &crtc, &encoder);
+		if (ret) {
+			NV_ERROR(dev, "can't determine outputs: 0x%08x\n",
+				 nv_rd32(0x610030));
+			break;
+		}
+
+		if (intr & ~0x0000007c) {
+			NV_ERROR(dev, "unknown PDISPLAY_INTR: 0x%08x\n", intr);
+			break;
+		}
+
+		if (intr & 0x00000010) {
+			nv_wr32(0x619494, nv_rd32(0x619494) & ~8);
+			nouveau_bios_run_display_table(dev, encoder->dcb, -1);
+			nv_wr32(0x610024, 0x00000010);
+			nv_wr32(0x610030, 0x80000000);
+		} else
+		if (intr & 0x00000020) {
+			nouveau_bios_run_display_table(dev, encoder->dcb, -2);
+			crtc->set_clock(crtc, crtc->mode);
+			nouveau_bios_run_display_table(dev, encoder->dcb,
+						       crtc->mode->clock);
+
+			tmp = nv_rd32(0x614200 + (crtc->index * 0x800));
+			tmp &= ~0x000000f;
+			nv_wr32(0x614200 + (crtc->index * 0x800), tmp);
+
+			if (encoder->dcb->type != OUTPUT_ANALOG) {
+				int limit;
+
+				if (encoder->dcb->type == OUTPUT_LVDS)
+					limit = 112000;
+				else
+					limit = 165000;
+
+				tmp = nv_rd32(0x614300 + (encoder->or * 0x800));
+				tmp &= ~0x00000f0f;
+				if (crtc->mode->clock > limit)
+					tmp |= 0x00000101;
+				nv_wr32(0x614300 + (encoder->or * 0x800), tmp);
+			} else {
+				nv_wr32(0x614280 + (encoder->or * 0x800), 0);
+			}
+
+			nv_wr32(0x610024, 0x00000020);
+			nv_wr32(0x610030, 0x80000000);
+		} else
+		if (intr & 0x00000040) {
+			nouveau_bios_run_display_table(dev, encoder->dcb,
+						       -crtc->mode->clock);
+			nv_wr32(0x610024, 0x00000040);
+			nv_wr32(0x610030, 0x80000000);
+			nv_wr32(0x619494, nv_rd32(0x619494) | 8);
+			continue;
+		} else
+		if (intr & 0x0000000c) {
+			nv_wr32(0x610024, intr & 0x0000000c);
+		}
+	}
+}
