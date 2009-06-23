@@ -76,7 +76,12 @@ nv50_sor_set_clock_mode(struct nouveau_encoder *encoder,
 		NV_TRACE(dev, "executing display table for %d %d %d %d\n",
 			 encoder->dcb->type, encoder->dcb->location,
 			 encoder->dcb->or, mode->clock);
-		ret = nouveau_bios_run_display_table(dev, encoder->dcb, mode->clock);
+		ret = nouveau_bios_run_display_table(dev, encoder->dcb,
+						     mode->clock);
+		if (!ret) {
+			ret = nouveau_bios_run_display_table(dev, encoder->dcb,
+							     -mode->clock);
+		}
 		if (ret)
 			NV_ERROR(dev, "error running display table, may hang\n");
 	}
