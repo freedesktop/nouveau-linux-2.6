@@ -41,7 +41,7 @@ int nouveau_duallink = 0;
 module_param_named(duallink, nouveau_duallink, int, 0400);
 
 MODULE_PARM_DESC(uscript, "Execute output scripts (>=GeForce 8)");
-int nouveau_uscript = 0;
+int nouveau_uscript = 1;
 module_param_named(uscript, nouveau_uscript, int, 0400);
 
 int nouveau_fbpercrtc = 0;
