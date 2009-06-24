@@ -67,7 +67,7 @@ nv50_instmem_init(struct drm_device *dev)
 	int ret, i;
 	uint32_t v, save_nv001700;
 
-	priv = drm_calloc(1, sizeof(*priv), DRM_MEM_DRIVER);
+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
 	dev_priv->engine.instmem.priv = priv;
@@ -132,7 +132,7 @@ nv50_instmem_init(struct drm_device *dev)
 	 * creation code assumes we have PRAMIN access, and we don't until
 	 * we're done here.
 	 */
-	chan = drm_calloc(1, sizeof(*chan), DRM_MEM_DRIVER);
+	chan = kzalloc(sizeof(*chan), GFP_KERNEL);
 	if (!chan)
 		return -ENOMEM;
 	chan->id = 0;
@@ -302,11 +302,11 @@ nv50_instmem_takedown(struct drm_device *dev)
 		nouveau_mem_takedown(&chan->ramin_heap);
 
 		dev_priv->fifos[0] = dev_priv->fifos[127] = NULL;
-		drm_free(chan, sizeof(*chan), DRM_MEM_DRIVER);
+		kfree(chan);
 	}
 
 	dev_priv->engine.instmem.priv = NULL;
-	drm_free(priv, sizeof(*priv), DRM_MEM_DRIVER);
+	kfree(priv);
 }
 
 int

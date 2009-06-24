@@ -211,7 +211,7 @@ nouveau_gpuobj_new(struct drm_device *dev, struct nouveau_channel *chan,
 	if (!dev_priv || !gpuobj_ret || *gpuobj_ret != NULL)
 		return -EINVAL;
 
-	gpuobj = drm_calloc(1, sizeof(*gpuobj), DRM_MEM_DRIVER);
+	gpuobj = kzalloc(sizeof(*gpuobj), GFP_KERNEL);
 	if (!gpuobj)
 		return -ENOMEM;
 	NV_DEBUG(dev, "gpuobj %p\n", gpuobj);
@@ -372,8 +372,7 @@ nouveau_gpuobj_del(struct drm_device *dev, struct nouveau_gpuobj **pgpuobj)
 
 	if (gpuobj->im_pramin) {
 		if (gpuobj->flags & NVOBJ_FLAG_FAKE)
-			drm_free(gpuobj->im_pramin, sizeof(*gpuobj->im_pramin),
-				 DRM_MEM_DRIVER);
+			kfree(gpuobj->im_pramin);
 		else
 			nouveau_mem_free_block(gpuobj->im_pramin);
 	}
@@ -381,7 +380,7 @@ nouveau_gpuobj_del(struct drm_device *dev, struct nouveau_gpuobj **pgpuobj)
 	list_del(&gpuobj->list);
 
 	*pgpuobj = NULL;
-	drm_free(gpuobj, sizeof(*gpuobj), DRM_MEM_DRIVER);
+	kfree(gpuobj);
 	return 0;
 }
 
@@ -455,7 +454,7 @@ nouveau_gpuobj_ref_add(struct drm_device *dev, struct nouveau_channel *chan,
 	if (ret)
 		return ret;
 
-	ref = drm_calloc(1, sizeof(*ref), DRM_MEM_DRIVER);
+	ref = kzalloc(sizeof(*ref), GFP_KERNEL);
 	if (!ref)
 		return -ENOMEM;
 	ref->gpuobj   = gpuobj;
@@ -467,7 +466,7 @@ nouveau_gpuobj_ref_add(struct drm_device *dev, struct nouveau_channel *chan,
 
 		ret = nouveau_ramht_insert(dev, ref);
 		if (ret) {
-			drm_free(ref, sizeof(*ref), DRM_MEM_DRIVER);
+			kfree(ref);
 			return ret;
 		}
 	} else {
@@ -502,7 +501,7 @@ int nouveau_gpuobj_ref_del(struct drm_device *dev, struct nouveau_gpuobj_ref **p
 	}
 
 	*pref = NULL;
-	drm_free(ref, sizeof(ref), DRM_MEM_DRIVER);
+	kfree(ref);
 	return 0;
 }
 
@@ -560,7 +559,7 @@ nouveau_gpuobj_new_fake(struct drm_device *dev, uint32_t p_offset,
 		 "p_offset=0x%08x b_offset=0x%08x size=0x%08x flags=0x%08x\n",
 		 p_offset, b_offset, size, flags);
 
-	gpuobj = drm_calloc(1, sizeof(*gpuobj), DRM_MEM_DRIVER);
+	gpuobj = kzalloc(sizeof(*gpuobj), GFP_KERNEL);
 	if (!gpuobj)
 		return -ENOMEM;
 	NV_DEBUG(dev, "gpuobj %p\n", gpuobj);
@@ -570,8 +569,8 @@ nouveau_gpuobj_new_fake(struct drm_device *dev, uint32_t p_offset,
 	list_add_tail(&gpuobj->list, &dev_priv->gpuobj_list);
 
 	if (p_offset != ~0) {
-		gpuobj->im_pramin = drm_calloc(1, sizeof(struct mem_block),
-					       DRM_MEM_DRIVER);
+		gpuobj->im_pramin = kzalloc(sizeof(struct mem_block),
+					    GFP_KERNEL);
 		if (!gpuobj->im_pramin) {
 			nouveau_gpuobj_del(dev, &gpuobj);
 			return -ENOMEM;

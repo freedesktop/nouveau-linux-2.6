@@ -447,7 +447,7 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	uint8_t architecture = 0;
 	int ret;
 
-	dev_priv = drm_calloc(1, sizeof(*dev_priv), DRM_MEM_DRIVER);
+	dev_priv = kzalloc(sizeof(*dev_priv), GFP_KERNEL);
 	if (!dev_priv)
 		return -ENOMEM;
 	dev->dev_private = dev_priv;
@@ -648,7 +648,7 @@ int nouveau_unload(struct drm_device *dev)
 	drm_rmmap(dev, dev_priv->ramin);
 	drm_rmmap(dev, dev_priv->fb);
 
-	drm_free(dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER);
+	kfree(dev_priv);
 	dev->dev_private = NULL;
 	return 0;
 }
@@ -798,12 +798,12 @@ static int nouveau_suspend(struct drm_device *dev)
 	struct nouveau_engine *engine = &dev_priv->engine;
 	int i;
 
-	drm_free(susres->ramin_copy, susres->ramin_size, DRM_MEM_DRIVER);
+	kfree(susres->ramin_copy);
 	susres->ramin_size = 0;
 	list_for_each(p, dev_priv->ramin_heap)
 		if (p->file_priv && (p->start + p->size) > susres->ramin_size)
 			susres->ramin_size = p->start + p->size;
-	if (!(susres->ramin_copy = drm_alloc(susres->ramin_size, DRM_MEM_DRIVER))) {
+	if (!(susres->ramin_copy = kmalloc(susres->ramin_size, GFP_KERNEL))) {
 		NV_ERROR(dev, "Couldn't alloc RAMIN backing for suspend\n");
 		return -ENOMEM;
 	}
@@ -942,7 +942,7 @@ static int nouveau_resume(struct drm_device *dev)
 	if (dev->irq_enabled)
 		nouveau_irq_postinstall(dev);
 
-	drm_free(susres->ramin_copy, susres->ramin_size, DRM_MEM_DRIVER);
+	kfree(susres->ramin_copy);
 	susres->ramin_copy = NULL;
 	susres->ramin_size = 0;
 

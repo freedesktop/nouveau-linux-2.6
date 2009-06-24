@@ -69,7 +69,7 @@ nouveau_bo_del_ttm(struct ttm_buffer_object *bo)
 
 	if (unlikely(nvbo->gem))
 		DRM_ERROR("bo %p still attached to GEM object\n", bo);
-	drm_free(nvbo, sizeof(*nvbo), DRM_MEM_DRIVER);
+	kfree(nvbo);
 }
 
 int
@@ -82,7 +82,7 @@ nouveau_bo_new(struct drm_device *dev, struct nouveau_channel *chan,
 	struct nouveau_bo *nvbo;
 	int ret;
 
-	nvbo = drm_calloc(1, sizeof(struct nouveau_bo), DRM_MEM_DRIVER);
+	nvbo = kzalloc(sizeof(struct nouveau_bo), GFP_KERNEL);
 	if (!nvbo)
 		return -ENOMEM;
 	nvbo->mappable = mappable;
@@ -507,12 +507,12 @@ u_memcpya(uint64_t user, unsigned nmemb, unsigned size)
 {
 	void *mem;
 
-	mem = drm_alloc(nmemb * size, DRM_MEM_DRIVER);
+	mem = kmalloc(nmemb * size, GFP_KERNEL);
 	if (!mem)
 		return (void *)-ENOMEM;
 
 	if (DRM_COPY_FROM_USER(mem, (void __user *)user, nmemb * size)) {
-		drm_free(mem, nmemb * size, DRM_MEM_DRIVER);
+		kfree(mem);
 		return (void *)-EFAULT;
 	}
 
@@ -555,16 +555,14 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 
 	bo = u_memcpya(req->buffers, req->nr_buffers, sizeof(*bo));
 	if (IS_ERR(bo)) {
-		drm_free(pushbuf, req->nr_dwords * sizeof(uint32_t),
-			 DRM_MEM_DRIVER);
+		kfree(pushbuf);
 		return (unsigned long)bo;
 	}
 
 	reloc = u_memcpya(req->relocs, req->nr_relocs, sizeof(*reloc));
 	if (IS_ERR(reloc)) {
-		drm_free(bo, req->nr_buffers * sizeof(*bo), DRM_MEM_DRIVER);
-		drm_free(pushbuf, req->nr_dwords * sizeof(uint32_t),
-			 DRM_MEM_DRIVER);
+		kfree(bo);
+		kfree(pushbuf);
 		return (unsigned long)reloc;
 	}
 
@@ -627,10 +625,9 @@ out:
 	if (fence)
 		ttm_fence_object_unref(&fence);
 
-	drm_free(pushbuf, req->nr_dwords * sizeof(uint32_t), DRM_MEM_DRIVER);
-	drm_free(bo, req->nr_buffers * sizeof(*bo), DRM_MEM_DRIVER);
-	drm_free(reloc, req->nr_relocs * sizeof(*reloc), DRM_MEM_DRIVER);
-
+	kfree(pushbuf);
+	kfree(bo);
+	kfree(reloc);
 	return ret;
 }
 

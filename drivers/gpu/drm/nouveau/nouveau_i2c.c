@@ -171,7 +171,7 @@ nouveau_i2c_new(struct drm_device *dev, const char *name, unsigned index,
 		return -EINVAL;
 	}
 
-	i2c = drm_calloc(1, sizeof(*i2c), DRM_MEM_DRIVER);
+	i2c = kzalloc(sizeof(*i2c), GFP_KERNEL);
 	if (i2c == NULL)
 		return -ENOMEM;
 
@@ -209,7 +209,7 @@ nouveau_i2c_new(struct drm_device *dev, const char *name, unsigned index,
 	default:
 		NV_ERROR(dev, "DCB I2C port type %d unknown\n",
 			 dcbi2c->port_type);
-		drm_free(i2c, sizeof(*i2c), DRM_MEM_DRIVER);
+		kfree(i2c);
 		return -EINVAL;
 	}
 	i2c->algo.udelay = 20;
@@ -221,7 +221,7 @@ nouveau_i2c_new(struct drm_device *dev, const char *name, unsigned index,
 	ret = i2c_bit_add_bus(&i2c->adapter);
 	if (ret) {
 		NV_ERROR(dev, "Failed to register i2c %s\n", name);
-		drm_free(i2c, sizeof(*i2c), DRM_MEM_DRIVER);
+		kfree(i2c);
 		return ret;
 	}
 
@@ -240,7 +240,7 @@ nouveau_i2c_del(struct nouveau_i2c_chan **pi2c)
 
 	*pi2c = NULL;
 	i2c_del_adapter(&i2c->adapter);
-	drm_free(i2c, sizeof(*i2c), DRM_MEM_DRIVER);
+	kfree(i2c);
 }
 
 bool

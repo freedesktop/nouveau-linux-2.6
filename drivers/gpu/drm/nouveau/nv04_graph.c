@@ -422,9 +422,8 @@ int nv04_graph_create_context(struct nouveau_channel *chan) {
 	struct graph_state* pgraph_ctx;
 	NV_DEBUG(chan-> dev, "nv04_graph_context_create %d\n", chan->id);
 
-	chan->pgraph_ctx = pgraph_ctx = drm_calloc(1, sizeof(*pgraph_ctx),
-					      DRM_MEM_DRIVER);
-
+	chan->pgraph_ctx = pgraph_ctx = kzalloc(sizeof(*pgraph_ctx),
+						GFP_KERNEL);
 	if (pgraph_ctx == NULL)
 		return -ENOMEM;
 
@@ -441,7 +440,7 @@ void nv04_graph_destroy_context(struct nouveau_channel *chan)
 {
 	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
 
-	drm_free(pgraph_ctx, sizeof(*pgraph_ctx), DRM_MEM_DRIVER);
+	kfree(pgraph_ctx);
 	chan->pgraph_ctx = NULL;
 }
 

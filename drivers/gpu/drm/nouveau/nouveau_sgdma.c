@@ -180,7 +180,7 @@ nouveau_sgdma_destroy(struct ttm_backend *be)
 		if (nvbe) {
 			if (nvbe->pages)
 				be->func->clear(be);
-			drm_free(nvbe, sizeof(*nvbe), DRM_MEM_DRIVER);
+			kfree(nvbe);
 		}
 	}
 }
@@ -202,7 +202,7 @@ nouveau_sgdma_init_ttm(struct drm_device *dev)
 	if (!dev_priv->gart_info.sg_ctxdma)
 		return NULL;
 
-	nvbe = drm_calloc(1, sizeof(*nvbe), DRM_MEM_DRIVER);
+	nvbe = kzalloc(sizeof(*nvbe), GFP_KERNEL);
 	if (!nvbe)
 		return NULL;
 

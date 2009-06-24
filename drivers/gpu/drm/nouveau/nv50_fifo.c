@@ -164,7 +164,7 @@ nv50_fifo_init(struct drm_device *dev)
 
 	NV_DEBUG(dev, "\n");
 
-	priv = drm_calloc(1, sizeof(*priv), DRM_MEM_DRIVER);
+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
 	dev_priv->engine.fifo.priv = priv;
@@ -208,7 +208,7 @@ nv50_fifo_takedown(struct drm_device *dev)
 	nouveau_gpuobj_ref_del(dev, &priv->thingo[1]);
 
 	dev_priv->engine.fifo.priv = NULL;
-	drm_free(priv, sizeof(*priv), DRM_MEM_DRIVER);
+	kfree(priv);
 }
 
 int

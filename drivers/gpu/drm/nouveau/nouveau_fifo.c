@@ -274,8 +274,8 @@ nouveau_fifo_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	if (channel == engine->fifo.channels)
 		return -EINVAL;
 
-	dev_priv->fifos[channel] = drm_calloc(1, sizeof(struct nouveau_channel),
-					      DRM_MEM_DRIVER);
+	dev_priv->fifos[channel] = kzalloc(sizeof(struct nouveau_channel),
+					   GFP_KERNEL);
 	if (!dev_priv->fifos[channel])
 		return -ENOMEM;
 	dev_priv->fifo_alloc_count++;
@@ -538,7 +538,7 @@ void nouveau_fifo_free(struct nouveau_channel *chan)
 
 	dev_priv->fifos[chan->id] = NULL;
 	dev_priv->fifo_alloc_count--;
-	drm_free(chan, sizeof(*chan), DRM_MEM_DRIVER);
+	kfree(chan);
 }
 
 /* cleanups all the fifos from file_priv */
