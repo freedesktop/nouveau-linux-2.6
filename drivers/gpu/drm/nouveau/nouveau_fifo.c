@@ -400,6 +400,8 @@ nouveau_fifo_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	engine->graph.fifo_access(dev, true);
 
 	ret = nouveau_dma_init(chan);
+	if (!ret)
+		ret = nouveau_fence_init(chan);
 	if (ret) {
 		nouveau_fifo_free(chan);
 		return ret;
@@ -479,15 +481,12 @@ void nouveau_fifo_free(struct nouveau_channel *chan)
 	 * the channel.
 	 */
 	if (!timeout) {
-		struct ttm_fence_object *fence = NULL;
+		struct nouveau_fence *fence = NULL;
 
-		ret = ttm_fence_object_create(&dev_priv->ttm.fdev, chan->id,
-					      TTM_FENCE_TYPE_EXE,
-					      TTM_FENCE_FLAG_EMIT, &fence);
+		ret = nouveau_fence_new(chan, &fence, true);
 		if (ret == 0) {
-			ret = ttm_fence_object_wait(fence, 0, 1,
-						    TTM_FENCE_TYPE_EXE);
-			ttm_fence_object_unref(&fence);
+			ret = nouveau_fence_wait(fence, NULL, false, false);
+			nouveau_fence_unref((void *)&fence);
 		}
 
 		if (ret) {
@@ -501,8 +500,7 @@ void nouveau_fifo_free(struct nouveau_channel *chan)
 	 * above attempts at idling were OK, but if we failed this'll tell TTM
 	 * we're done with the buffers.
 	 */
-	ttm_fence_handler(&dev_priv->ttm.fdev, chan->id, chan->next_sequence,
-			  TTM_FENCE_TYPE_EXE, 0);
+	nouveau_fence_fini(chan);
 
 	/* disable the fifo caches */
 	nv_wr32(NV03_PFIFO_CACHES, 0x00000000);

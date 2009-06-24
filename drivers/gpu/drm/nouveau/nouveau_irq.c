@@ -379,7 +379,7 @@ nouveau_pgraph_intr_notify(struct drm_device *dev, uint32_t nsource)
 			  trap.mthd, trap.class);
 
 		if (trap.class == 0x0039 && trap.mthd == 0x0150) {
-			chan->last_sequence_irq = trap.data;
+			chan->fence.last_sequence_irq = trap.data;
 			nouveau_fence_handler(dev, trap.channel);
 		} else
 		if (nouveau_sw_method_execute(dev, trap.class, trap.mthd)) {

@@ -29,8 +29,6 @@
 
 #include "drmP.h"
 
-#include "ttm/ttm_fence_api.h"
-
 #include "nouveau_drm.h"
 #include "nouveau_drv.h"
 #include "nouveau_dma.h"
@@ -151,20 +149,18 @@ nouveau_bo_move_accel_cleanup(struct nouveau_bo *nvbo, bool evict, bool no_wait,
 			      struct ttm_mem_reg *new_mem)
 {
 	struct drm_nouveau_private *dev_priv = nouveau_bdev(nvbo->bo.bdev);
-	struct ttm_fence_object *fence = NULL;
-	const int class = nvbo->channel ? nvbo->channel->id : 0;
-	void *fence_type = (void *)TTM_FENCE_TYPE_EXE;
+	struct nouveau_channel *chan =
+		nvbo->channel ? nvbo->channel : dev_priv->channel;
+	struct nouveau_fence *fence = NULL;
 	int ret;
 
-	ret = ttm_fence_object_create(&dev_priv->ttm.fdev, class,
-				      TTM_FENCE_TYPE_EXE,
-				      TTM_FENCE_FLAG_EMIT, &fence);
+	ret = nouveau_fence_new(chan, &fence, true);
 	if (ret)
 		return ret;
 
-	ret = ttm_bo_move_accel_cleanup(&nvbo->bo, fence, fence_type,
+	ret = ttm_bo_move_accel_cleanup(&nvbo->bo, fence, NULL,
 					evict, no_wait, new_mem);
-	ttm_fence_object_unref(&fence);
+	nouveau_fence_unref((void *)&fence);
 	return ret;
 }
 
@@ -419,9 +415,10 @@ struct ttm_bo_driver nouveau_bo_driver = {
 	.evict_flags = nouveau_bo_evict_flags,
 	.move = nouveau_bo_move,
 	.verify_access = nouveau_bo_verify_access,
-	.sync_obj_signaled = ttm_fence_sync_obj_signaled,
-	.sync_obj_wait = ttm_fence_sync_obj_wait,
-	.sync_obj_flush = ttm_fence_sync_obj_flush,
-	.sync_obj_unref = ttm_fence_sync_obj_unref,
-	.sync_obj_ref = ttm_fence_sync_obj_ref,
+	.sync_obj_signaled = nouveau_fence_signalled,
+	.sync_obj_wait = nouveau_fence_wait,
+	.sync_obj_flush = nouveau_fence_flush,
+	.sync_obj_unref = nouveau_fence_unref,
+	.sync_obj_ref = nouveau_fence_ref,
 };
+

@@ -172,8 +172,12 @@ struct nouveau_channel
 	uint32_t user_put;
 
 	/* Fencing */
-	uint32_t next_sequence;
-	uint32_t last_sequence_irq;
+	struct {
+		struct list_head pending;
+		uint32_t sequence;
+		uint32_t sequence_ack;
+		uint32_t last_sequence_irq;
+	} fence;
 
 	/* DMA push buffer */
 	struct nouveau_gpuobj_ref *pushbuf;
@@ -849,10 +853,19 @@ extern int nv04_crtc_create(struct drm_device *, int index);
 extern struct ttm_bo_driver nouveau_bo_driver;
 
 /* nouveau_fence.c */
-extern int nouveau_fence_ttm_device_init(struct drm_device *dev);
+struct nouveau_fence;
+extern int nouveau_fence_init(struct nouveau_channel *);
+extern void nouveau_fence_fini(struct nouveau_channel *);
+extern int nouveau_fence_new(struct nouveau_channel *, struct nouveau_fence **,
+			     bool emit);
+extern int nouveau_fence_emit(struct nouveau_fence *);
+struct nouveau_channel *nouveau_fence_channel(struct nouveau_fence *);
+extern bool nouveau_fence_signalled(void *obj, void *arg);
+extern int nouveau_fence_wait(void *obj, void *arg, bool lazy, bool intr);
+extern int nouveau_fence_flush(void *obj, void *arg);
+extern void nouveau_fence_unref(void **obj);
+extern void *nouveau_fence_ref(void *obj);
 extern void nouveau_fence_handler(struct drm_device *dev, int channel);
-extern struct nouveau_channel *
-nouveau_fence_channel(struct drm_device *dev, uint32_t fence_class);
 
 /* nouveau_gem.c */
 extern int nouveau_gem_object_new(struct drm_gem_object *);

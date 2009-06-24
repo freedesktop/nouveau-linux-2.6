@@ -289,7 +289,6 @@ void nouveau_mem_close(struct drm_device *dev)
 	ttm_bo_clean_mm(&dev_priv->ttm.bdev, TTM_PL_VRAM);
 
 	ttm_bo_device_release(&dev_priv->ttm.bdev);
-	ttm_fence_device_release(&dev_priv->ttm.fdev);
 	ttm_object_device_release(&dev_priv->ttm.tdev);
 
 	nouveau_ttm_global_release(dev_priv);
@@ -461,12 +460,6 @@ nouveau_mem_init(struct drm_device *dev)
 	if (dev_priv->ttm.tdev == NULL) {
 		NV_ERROR(dev, "Error initialising ttm device\n");
 		return -ENOMEM;
-	}
-
-	ret = nouveau_fence_ttm_device_init(dev);
-	if (ret) {
-		NV_ERROR(dev, "Error initialising fence driver: %d\n", ret);
-		return ret;
 	}
 
 	ret = ttm_bo_device_init(&dev_priv->ttm.bdev,

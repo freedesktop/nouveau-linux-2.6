@@ -350,11 +350,10 @@ nouveau_gem_pushbuf_bo_validate(struct nouveau_channel *chan,
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_gem_pushbuf_bo *b;
+	struct nouveau_fence *prev_fence;
 	struct nouveau_bo *nvbo;
 	struct list_head *entry, *tmp;
-	struct ttm_fence_object *old_fence;
 	int ret, i;
-
 
 	if (nr_buffers == 0)
 		return 0;
@@ -387,7 +386,7 @@ nouveau_gem_pushbuf_bo_validate(struct nouveau_channel *chan,
 		list_add_tail(&nvbo->validate.head, list);
 	}
 
-	ret = ttm_eu_reserve_buffers(list, chan->next_sequence);
+	ret = ttm_eu_reserve_buffers(list, chan->fence.sequence);
 	if (ret)
 		goto out_unref;
 
@@ -395,8 +394,8 @@ nouveau_gem_pushbuf_bo_validate(struct nouveau_channel *chan,
 	list_for_each_safe(entry, tmp, list) {
 		nvbo = list_entry(entry, struct nouveau_bo, validate.head);
 
-		old_fence = nvbo->bo.sync_obj;
-		if (old_fence && old_fence->fence_class != chan->id) {
+		prev_fence = nvbo->bo.sync_obj;
+		if (prev_fence && nouveau_fence_channel(prev_fence) != chan) {
 			spin_lock(&nvbo->bo.lock);
 			ret = ttm_bo_wait(&nvbo->bo, false, false, false);
 			spin_unlock(&nvbo->bo.lock);
@@ -523,11 +522,10 @@ int
 nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 			  struct drm_file *file_priv)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_nouveau_gem_pushbuf *req = data;
 	struct drm_nouveau_gem_pushbuf_bo *bo = NULL;
 	struct drm_nouveau_gem_pushbuf_reloc *reloc = NULL;
-	struct ttm_fence_object *fence = NULL;
+	struct nouveau_fence *fence = NULL;
 	struct nouveau_channel *chan;
 	struct list_head list;
 	uint32_t *pushbuf = NULL;
@@ -567,8 +565,7 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 	}
 
 	/* Validate buffer list */
-	ret = ttm_fence_object_create(&dev_priv->ttm.fdev, chan->id,
-				      TTM_FENCE_TYPE_EXE, 0, &fence);
+	ret = nouveau_fence_new(chan, &fence, false);
 	if (ret)
 		goto out;
 
@@ -601,7 +598,7 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 	for (i = 0; i < req->nr_dwords; i++)
 		OUT_RING (chan, pushbuf[i]);
 
-	ret = ttm_fence_object_emit(fence, 0, chan->id, TTM_FENCE_TYPE_EXE);
+	ret = nouveau_fence_emit(fence);
 	if (ret) {
 		NV_ERROR(dev, "error fencing pushbuf: %d\n", ret);
 
@@ -612,7 +609,7 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 	ttm_eu_fence_buffer_objects(&list, fence);
 
 	if (nouveau_gem_pushbuf_sync(chan)) {
-		ret = ttm_fence_object_wait(fence, 0, 1, 1);
+		ret = nouveau_fence_wait(fence, NULL, false, false);
 		if (ret) {
 			for (i = 0; i < req->nr_dwords; i++)
 				NV_ERROR(dev, "0x%08x\n", pushbuf[i]);
@@ -622,8 +619,7 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 
 	FIRE_RING(chan);
 out:
-	if (fence)
-		ttm_fence_object_unref(&fence);
+	nouveau_fence_unref((void *)&fence);
 
 	kfree(pushbuf);
 	kfree(bo);
