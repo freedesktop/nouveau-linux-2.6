@@ -103,7 +103,7 @@ nouveau_fence_new(struct nouveau_channel *chan, struct nouveau_fence **pfence,
 		ret = nouveau_fence_emit(fence);
 
 	if (ret)
-		nouveau_fence_unref(&fence);
+		nouveau_fence_unref((void *)&fence);
 	*pfence = fence;
 	return ret;
 }

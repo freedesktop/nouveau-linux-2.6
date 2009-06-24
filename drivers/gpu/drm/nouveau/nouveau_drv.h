@@ -44,7 +44,6 @@
 #include "ttm/ttm_bo_driver.h"
 #include "ttm/ttm_fence_driver.h"
 #include "ttm/ttm_placement_common.h"
-#include "ttm/ttm_execbuf_util.h"
 
 struct nouveau_fpriv {
 	struct ttm_object_file *tfile;
@@ -71,9 +70,10 @@ struct nouveau_fpriv {
 #define NV50_VM_VRAM_NR  (NV50_VM_MAX_VRAM / NV50_VM_BLOCK)
 
 struct nouveau_bo {
-	struct ttm_validate_buffer validate;
 	struct ttm_buffer_object bo;
 	struct ttm_bo_kmap_obj kmap;
+
+	struct list_head entry;
 
 	struct nouveau_channel *channel;
 

@@ -336,17 +336,50 @@ nouveau_gem_set_domain(struct drm_gem_object *gem, uint32_t read_domains,
 	return 0;
 }
 
-struct nouveau_gem_validate_buffer {
-	struct ttm_validate_buffer base;
-	struct drm_nouveau_gem_pushbuf_bo *b;
-};
+static void
+nouveau_gem_pushbuf_backoff(struct list_head *list)
+{
+	struct list_head *entry, *tmp;
+	struct nouveau_bo *nvbo;
+
+	list_for_each_safe(entry, tmp, list) {
+		nvbo = list_entry(entry, struct nouveau_bo, entry);
+
+		drm_gem_object_unreference(nvbo->gem);
+		ttm_bo_unreserve(&nvbo->bo);
+		list_del(&nvbo->entry);
+	}
+}
+
+static void
+nouveau_gem_pushbuf_fence(struct list_head *list, struct nouveau_fence *fence)
+{
+	struct list_head *entry, *tmp;
+	struct nouveau_fence *prev_fence;
+	struct nouveau_bo *nvbo;
+
+	list_for_each_safe(entry, tmp, list) {
+		nvbo = list_entry(entry, struct nouveau_bo, entry);
+
+		spin_lock(&nvbo->bo.lock);
+		prev_fence = nvbo->bo.sync_obj;
+		nvbo->bo.sync_obj = nouveau_fence_ref(fence);
+		spin_unlock(&nvbo->bo.lock);
+
+		drm_gem_object_unreference(nvbo->gem);
+		ttm_bo_unreserve(&nvbo->bo);
+		list_del(&nvbo->entry);
+
+		nouveau_fence_unref((void *)&prev_fence);
+	}
+}
 
 static int
-nouveau_gem_pushbuf_bo_validate(struct nouveau_channel *chan,
-				struct drm_file *file_priv,
-				struct drm_nouveau_gem_pushbuf_bo *pbbo,
-				uint64_t user_bo, int nr_buffers,
-				struct list_head *list, int *apply_relocs)
+nouveau_gem_pushbuf_validate(struct nouveau_channel *chan,
+			     struct drm_file *file_priv,
+			     struct drm_nouveau_gem_pushbuf_bo *pbbo,
+			     uint64_t user_bo, int nr_buffers,
+			     struct list_head *list, int *apply_relocs)
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_gem_pushbuf_bo *b;
@@ -361,8 +394,7 @@ nouveau_gem_pushbuf_bo_validate(struct nouveau_channel *chan,
 	if (apply_relocs)
 		*apply_relocs = 0;
 
-	mutex_lock(&dev->struct_mutex);
-
+retry:
 	for (i = 0, b = pbbo; i < nr_buffers; i++, b++) {
 		struct drm_gem_object *gem;
 
@@ -374,25 +406,33 @@ nouveau_gem_pushbuf_bo_validate(struct nouveau_channel *chan,
 		}
 		nvbo = gem->driver_private;
 
-		ret = nouveau_gem_set_domain(gem, b->read_domains,
-					     b->write_domains,
-					     b->valid_domains);
-		if (ret)
-			goto out_unref;
+		ret = ttm_bo_reserve(&nvbo->bo, false, false, true,
+				     chan->fence.sequence);
+		if (ret) {
+			nouveau_gem_pushbuf_backoff(list);
+			if (ret == -EAGAIN) {
+				ret = ttm_bo_wait_unreserved(&nvbo->bo, false);
+				if (unlikely(ret))
+					goto out_unref;
+				goto retry;
+			} else
+				goto out_unref;
+		}
 
-		nvbo->validate.bo = &nvbo->bo;
-		nvbo->validate.new_sync_obj_arg = (void*)TTM_FENCE_TYPE_EXE;
-		nvbo->validate.reserved = false;
-		list_add_tail(&nvbo->validate.head, list);
+		if (unlikely(atomic_read(&nvbo->bo.cpu_writers) > 0)) {
+			nouveau_gem_pushbuf_backoff(list);
+			ret = ttm_bo_wait_cpu(&nvbo->bo, false);
+			if (ret)
+				goto out_unref;
+			goto retry;
+		}
+
+		list_add_tail(&nvbo->entry, list);
 	}
-
-	ret = ttm_eu_reserve_buffers(list, chan->fence.sequence);
-	if (ret)
-		goto out_unref;
 
 	b = pbbo;
 	list_for_each_safe(entry, tmp, list) {
-		nvbo = list_entry(entry, struct nouveau_bo, validate.head);
+		nvbo = list_entry(entry, struct nouveau_bo, entry);
 
 		prev_fence = nvbo->bo.sync_obj;
 		if (prev_fence && nouveau_fence_channel(prev_fence) != chan) {
@@ -402,6 +442,12 @@ nouveau_gem_pushbuf_bo_validate(struct nouveau_channel *chan,
 			if (ret)
 				goto out_unref;
 		}
+
+		ret = nouveau_gem_set_domain(nvbo->gem, b->read_domains,
+					     b->write_domains,
+					     b->valid_domains);
+		if (ret)
+			goto out_unref;
 
 		nvbo->channel = chan;
 		ret = ttm_buffer_object_validate(&nvbo->bo,
@@ -442,15 +488,8 @@ nouveau_gem_pushbuf_bo_validate(struct nouveau_channel *chan,
 
 out_unref:
 	if (unlikely(ret))
-		ttm_eu_backoff_reservation(list);
+		nouveau_gem_pushbuf_backoff(list);
 
-	list_for_each_safe(entry, tmp, list) {
-		nvbo = list_entry(entry, struct nouveau_bo, validate.head);
-
-		drm_gem_object_unreference(nvbo->gem);
-	}
-
-	mutex_unlock(&dev->struct_mutex);
 	return ret;
 }
 
@@ -564,16 +603,17 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 		return (unsigned long)reloc;
 	}
 
+	mutex_lock(&dev->struct_mutex);
+
+	INIT_LIST_HEAD(&list);
+
 	/* Validate buffer list */
 	ret = nouveau_fence_new(chan, &fence, false);
 	if (ret)
 		goto out;
 
-	INIT_LIST_HEAD(&list);
-
-	ret = nouveau_gem_pushbuf_bo_validate(chan, file_priv, bo,
-					      req->buffers, req->nr_buffers,
-					      &list, NULL);
+	ret = nouveau_gem_pushbuf_validate(chan, file_priv, bo, req->buffers,
+					   req->nr_buffers, &list, NULL);
 	if (ret)
 		goto out;
 
@@ -581,19 +621,15 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 	ret = nouveau_gem_pushbuf_reloc_apply(chan, reloc, bo, pushbuf,
 					      req->nr_relocs, req->nr_buffers,
 					      req->nr_dwords);
-	if (ret) {
-		ttm_eu_backoff_reservation(&list);
+	if (ret)
 		goto out;
-	}
 
 	/* Emit push buffer to the hw
 	 *XXX: OMG ALSO YUCK!!!
 	 */
 	ret = RING_SPACE(chan, req->nr_dwords);
-	if (ret) {
-		ttm_eu_backoff_reservation(&list);
+	if (ret)
 		goto out;
-	}
 
 	for (i = 0; i < req->nr_dwords; i++)
 		OUT_RING (chan, pushbuf[i]);
@@ -601,12 +637,11 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 	ret = nouveau_fence_emit(fence);
 	if (ret) {
 		NV_ERROR(dev, "error fencing pushbuf: %d\n", ret);
-
 		WIND_RING(chan);
-		ttm_eu_backoff_reservation(&list);
 		goto out;
 	}
-	ttm_eu_fence_buffer_objects(&list, fence);
+
+	nouveau_gem_pushbuf_fence(&list, fence);
 
 	if (nouveau_gem_pushbuf_sync(chan)) {
 		ret = nouveau_fence_wait(fence, NULL, false, false);
@@ -619,7 +654,11 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 
 	FIRE_RING(chan);
 out:
+	if (unlikely(ret))
+		nouveau_gem_pushbuf_backoff(&list);
 	nouveau_fence_unref((void *)&fence);
+
+	mutex_unlock(&dev->struct_mutex);
 
 	kfree(pushbuf);
 	kfree(bo);
