@@ -3188,7 +3188,7 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 	if (pxclk == 0) {
 		script = ROM16(otable[6]);
 		if (!script) {
-			NV_ERROR(dev, "output script 0 not found\n");
+			NV_DEBUG(dev, "output script 0 not found\n");
 			return 1;
 		}
 
@@ -3198,7 +3198,7 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 	if (pxclk == -1) {
 		script = ROM16(otable[8]);
 		if (!script) {
-			NV_ERROR(dev, "output script 1 not found\n");
+			NV_DEBUG(dev, "output script 1 not found\n");
 			return 1;
 		}
 
@@ -3208,7 +3208,7 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 	if (pxclk == -2 && table[4] >= 12) {
 		script = ROM16(otable[10]);
 		if (!script) {
-			NV_ERROR(dev, "output script 2 not found\n");
+			NV_DEBUG(dev, "output script 2 not found\n");
 			return 1;
 		}
 
@@ -3232,7 +3232,7 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 		if (script)
 			script = clkcmptable(bios, script, -pxclk);
 		if (!script) {
-			NV_ERROR(dev, "clock script 1 not found\n");
+			NV_DEBUG(dev, "clock script 1 not found\n");
 			return 1;
 		}
 
