@@ -158,7 +158,6 @@ nouveau_fifo_irq_handler(struct drm_device *dev)
 		if (status) {
 			NV_INFO(dev, "Unhandled PFIFO_INTR - 0x%08x\n", status);
 			nv_wr32(NV03_PFIFO_INTR_0, status);
-			nv_wr32(NV03_PMC_INTR_EN_0, 0);
 		}
 
 		nv_wr32(NV03_PFIFO_CACHES, reassign);
