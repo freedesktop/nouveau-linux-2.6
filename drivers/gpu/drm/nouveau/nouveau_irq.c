@@ -41,11 +41,52 @@
 #include "nouveau_connector.h"
 #include "nv50_display.h"
 
+extern int nouveau_uscript;
+
+static void
+nv50_irq_work_handler(struct work_struct *work)
+{
+	struct drm_nouveau_private *dev_priv =
+		container_of(work, struct drm_nouveau_private, irq_work);
+	struct drm_device *dev = dev_priv->dev;	
+	uint32_t status = 0;
+	int count = 0;
+
+	while (count++ < 100) {
+		status  = nv_rd32(NV03_PMC_INTR_0);
+		status &= (NV_PMC_INTR_0_NV50_DISPLAY_PENDING |
+			   NV_PMC_INTR_0_NV50_I2C_PENDING);
+		if (!status)
+			break;
+
+		if (status & NV_PMC_INTR_0_NV50_DISPLAY_PENDING) {
+			if (nouveau_uscript == 1)
+				nv50_display_irq_handler(dev);
+			else
+				nv50_display_irq_handler_old(dev);
+		}
+
+		if (status & NV_PMC_INTR_0_NV50_I2C_PENDING) {
+			NV_DEBUG(dev, "HOTPLUG_CTRL: 0x%08x\n",
+				 nv_rd32(NV50_PCONNECTOR_HOTPLUG_CTRL));
+			nv_wr32(NV50_PCONNECTOR_HOTPLUG_CTRL, 0x7fff7fff);
+		}
+	}
+
+	if (status)
+		NV_ERROR(dev, "display irqs still pending: 0x%08x\n", status);
+}
+
 void
 nouveau_irq_preinstall(struct drm_device *dev)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
 	/* Master disable */
 	nv_wr32(NV03_PMC_INTR_EN_0, 0);
+
+	if (dev_priv->card_type == NV_50)
+		INIT_WORK(&dev_priv->irq_work, nv50_irq_work_handler);
 }
 
 int
@@ -117,7 +158,6 @@ nouveau_fifo_irq_handler(struct drm_device *dev)
 		if (status) {
 			NV_INFO(dev, "Unhandled PFIFO_INTR - 0x%08x\n", status);
 			nv_wr32(NV03_PFIFO_INTR_0, status);
-			nv_wr32(NV03_PMC_INTR_EN_0, 0);
 		}
 
 		nv_wr32(NV03_PFIFO_CACHES, reassign);
@@ -338,7 +378,7 @@ nouveau_pgraph_intr_notify(struct drm_device *dev, uint32_t nsource)
 			  trap.mthd, trap.class);
 
 		if (trap.class == 0x0039 && trap.mthd == 0x0150) {
-			chan->last_sequence_irq = trap.data;
+			chan->fence.last_sequence_irq = trap.data;
 			nouveau_fence_handler(dev, trap.channel);
 		} else
 		if (nouveau_sw_method_execute(dev, trap.class, trap.mthd)) {
@@ -529,19 +569,6 @@ nouveau_crtc_irq_handler(struct drm_device *dev, int crtc)
 		nv_wr32(NV_CRTC1_INTSTAT, NV_CRTC_INTR_VBLANK);
 }
 
-static void
-nouveau_nv50_i2c_irq_handler(struct drm_device *dev)
-{
-	NV_DEBUG(dev, "NV50_PCONNECTOR_HOTPLUG_CTRL - 0x%08X\n",
-		 nv_rd32(NV50_PCONNECTOR_HOTPLUG_CTRL));
-
-	/* This seems to be the way to acknowledge an interrupt. */
-	nv_wr32(NV50_PCONNECTOR_HOTPLUG_CTRL, 0x7FFF7FFF);
-
-	/* Do a "dumb" detect all */
-	nv50_connector_detect_all(dev);
-}
-
 irqreturn_t
 nouveau_irq_handler(DRM_IRQ_ARGS)
 {
@@ -572,14 +599,11 @@ nouveau_irq_handler(DRM_IRQ_ARGS)
 		status &= ~NV_PMC_INTR_0_CRTCn_PENDING;
 	}
 
-	if (status & NV_PMC_INTR_0_NV50_DISPLAY_PENDING) {
-		nv50_display_irq_handler(dev);
-		status &= ~NV_PMC_INTR_0_NV50_DISPLAY_PENDING;
-	}
-
-	if (status & NV_PMC_INTR_0_NV50_I2C_PENDING) {
-		nouveau_nv50_i2c_irq_handler(dev);
-		status &= ~NV_PMC_INTR_0_NV50_I2C_PENDING;
+	if (status & (NV_PMC_INTR_0_NV50_DISPLAY_PENDING |
+		      NV_PMC_INTR_0_NV50_I2C_PENDING)) {
+		schedule_work(&dev_priv->irq_work);
+		status &= ~(NV_PMC_INTR_0_NV50_DISPLAY_PENDING |
+			    NV_PMC_INTR_0_NV50_I2C_PENDING);
 	}
 
 	if (status)

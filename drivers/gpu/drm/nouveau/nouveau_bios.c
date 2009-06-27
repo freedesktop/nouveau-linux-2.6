@@ -3047,14 +3047,11 @@ int nouveau_bios_parse_lvds_table(struct drm_device *dev, int pxclk, bool *dl, b
 		bios->fp.dual_link = bios->data[lvdsofs] & 1;
 		bios->fp.BITbit1 = bios->data[lvdsofs] & 2;
 		bios->fp.duallink_transition_clk = ROM16(bios->data[bios->fp.lvdsmanufacturerpointer + 5]) * 10;
-#if 0	// currently unused
 		break;
 	case 0x40:
-		/* fairly sure, but not 100% */
-		bios->fp.dual_link = bios->data[lvdsofs] & 1;
+		//bios->fp.dual_link = bios->data[lvdsofs] & 1;
 		bios->fp.duallink_transition_clk = ROM16(bios->data[bios->fp.lvdsmanufacturerpointer + 5]) * 10;
 		break;
-#endif
 	}
 
 	/* set dual_link flag for EDID case */
@@ -3064,69 +3061,6 @@ int nouveau_bios_parse_lvds_table(struct drm_device *dev, int pxclk, bool *dl, b
 	*dl = bios->fp.dual_link;
 
 	return 0;
-}
-
-static int
-find_script_pointers(struct drm_device *dev, uint8_t *table, uint16_t *script0,
-		     uint16_t *script1, uint16_t headerlen, int pxclk,
-		     int cmpval)
-{
-	/* The output script tables describing a particular output type
-	 * look as follows:
-	 *
-	 * offset + 0   (32 bits): output this table matches (hash of DCB)
-	 * offset + 4   ( 8 bits): unknown
-	 * offset + 5   ( 8 bits): number of configurations
-	 * offset + 6   (16 bits): pointer to some script
-	 * offset + 8   (16 bits): pointer to some script
-	 *
-	 * headerlen == 10
-	 * offset + 10           : configuration 0
-	 *
-	 * headerlen == 12
-	 * offset + 10           : pointer to some script
-	 * offset + 12           : configuration 0
-	 *
-	 * Each config entry is as follows:
-	 *
-	 * offset + 0   (16 bits): unknown, assumed to be a match value
-	 * offset + 2   (16 bits): pointer to script table (clock set?)
-	 * offset + 4   (16 bits): pointer to script table (reset?)
-	 *
-	 * There doesn't appear to be a count value to say how many
-	 * entries exist in each script table, instead, a 0 value in
-	 * the first 16-bit word seems to indicate both the end of the
-	 * list and the default entry.  The second 16-bit word in the
-	 * script tables is a pointer to the script to execute.
-	 */
-
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nvbios *bios = &dev_priv->VBIOS;
-	int i;
-
-	*script0 = *script1 = 0;
-	for (i = 0; i < table[5]; i++) {
-		uint16_t offset;
-
-		if (ROM16(table[headerlen + i*6 + 0]) != cmpval)
-			continue;
-
-		offset = ROM16(table[headerlen + i*6 + 2]);
-		if (offset)
-			*script0 = clkcmptable(bios, offset, pxclk);
-
-		if (!*script0)
-			NV_WARN(dev, "script0 missing!\n");
-
-		offset = ROM16(table[headerlen + i*6 + 4]);
-		if (offset)
-			*script1 = clkcmptable(bios, offset, pxclk);
-
-		return 0;
-	}
-
-	NV_ERROR(dev, "couldn't find suitable output scripts\n");
-	return 1;
 }
 
 int
@@ -3160,8 +3094,8 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 	struct nvbios *bios = &dev_priv->VBIOS;
 	uint8_t *table = &bios->data[bios->display.script_table_ptr];
 	uint8_t *entry, *otable = NULL;
-	uint16_t script0, script1;
-	int i;
+	uint16_t script;
+	int i, sub;
 
 	if (!bios->display.script_table_ptr) {
 		NV_ERROR(dev, "No pointer to output script table\n");
@@ -3172,6 +3106,35 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 		NV_ERROR(dev, "Output script table version 0x%02x unknown\n", table[0]);
 		return 1;
 	}
+
+	/* The output script tables describing a particular output type
+	 * look as follows:
+	 *
+	 * offset + 0   (32 bits): output this table matches (hash of DCB)
+	 * offset + 4   ( 8 bits): unknown
+	 * offset + 5   ( 8 bits): number of configurations
+	 * offset + 6   (16 bits): pointer to some script
+	 * offset + 8   (16 bits): pointer to some script
+	 *
+	 * headerlen == 10
+	 * offset + 10           : configuration 0
+	 *
+	 * headerlen == 12
+	 * offset + 10           : pointer to some script
+	 * offset + 12           : configuration 0
+	 *
+	 * Each config entry is as follows:
+	 *
+	 * offset + 0   (16 bits): unknown, assumed to be a match value
+	 * offset + 2   (16 bits): pointer to script table (clock set?)
+	 * offset + 4   (16 bits): pointer to script table (reset?)
+	 *
+	 * There doesn't appear to be a count value to say how many
+	 * entries exist in each script table, instead, a 0 value in
+	 * the first 16-bit word seems to indicate both the end of the
+	 * list and the default entry.  The second 16-bit word in the
+	 * script tables is a pointer to the script to execute.
+	 */
 
 	NV_DEBUG(dev, "Searching for output entry for %d %d %d\n",
 			dcbent->type, dcbent->location, dcbent->or);
@@ -3196,23 +3159,85 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 		return 1;
 	}
 
-	if (find_script_pointers(dev, otable, &script0, &script1, table[4],
-				 pxclk, dcbent->type == OUTPUT_LVDS ?
-				 0x0100 : (pxclk > 165000 ? 0x0105 : 0x0001)))
-		return 1;
-	bios->display.head = ffs(dcbent->or) - 1;
-
-	if (script0) {
-		NV_TRACE(dev, "0x%04X: Parsing output Script0\n", script0);
-		parse_init_table(dev, bios, script0, &iexec);
-	} else {
-		NV_ERROR(dev, "clock script missing!\n");
-		return 1;
+	/* Anyone have an idea to know which to use for certain? */
+	switch (dcbent->type) {
+	case OUTPUT_LVDS:
+		sub = 0x0100; /* 0x0000 0x0100 0x0200 0x0300 */
+		break;
+	case OUTPUT_TMDS:
+		sub = 0x0001; /* 0x0001 0x0002 0x0105 */
+		break;
+	default:
+		sub = 0x0000; /* 0x0000 */
+		break;
 	}
 
-	if (script1) {
-		NV_TRACE(dev, "0x%04X: Parsing output Script1\n", script1);
-		parse_init_table(dev, bios, script1, &iexec);
+	for (i = 0; i < otable[5]; i++) {
+		if (ROM16(otable[table[4] + i*6]) == sub)
+			break;
+	}
+
+	if (i == otable[5])
+		i = 0;
+
+	bios->display.head = ffs(dcbent->or) - 1;
+
+	if (pxclk == 0) {
+		script = ROM16(otable[6]);
+		if (!script) {
+			NV_DEBUG(dev, "output script 0 not found\n");
+			return 1;
+		}
+
+		NV_TRACE(dev, "0x%04X: parsing output script 0\n", script);
+		parse_init_table(dev, bios, script, &iexec);
+	} else
+	if (pxclk == -1) {
+		script = ROM16(otable[8]);
+		if (!script) {
+			NV_DEBUG(dev, "output script 1 not found\n");
+			return 1;
+		}
+
+		NV_TRACE(dev, "0x%04X: parsing output script 1\n", script);
+		parse_init_table(dev, bios, script, &iexec);
+	} else
+	if (pxclk == -2) {
+		if (table[4] >= 12)
+			script = ROM16(otable[10]);
+		else
+			script = 0;
+		if (!script) {
+			NV_DEBUG(dev, "output script 2 not found\n");
+			return 1;
+		}
+
+		NV_TRACE(dev, "0x%04X: parsing output script 2\n", script);
+		parse_init_table(dev, bios, script, &iexec);
+	} else
+	if (pxclk > 0) {
+		script = ROM16(otable[table[4] + i*6 + 2]);
+		if (script)
+			script = clkcmptable(bios, script, pxclk);
+		if (!script) {
+			NV_ERROR(dev, "clock script 0 not found\n");
+			return 1;
+		}
+
+		NV_TRACE(dev, "0x%04X: parsing clock script 0\n", script);
+		parse_init_table(dev, bios, script, &iexec);
+	} else
+	if (pxclk < 0) {
+		script = ROM16(otable[table[4] + i*6 + 4]);
+		if (script)
+			script = clkcmptable(bios, script, -pxclk);
+		if (!script) {
+			NV_DEBUG(dev, "clock script 1 not found\n");
+			return 1;
+		}
+
+		NV_TRACE(dev, "0x%04X: parsing clock script 1\n", script);
+		parse_init_table(dev, bios, script, &iexec);
 	}
 
 	return 0;

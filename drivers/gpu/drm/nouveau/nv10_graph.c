@@ -769,9 +769,8 @@ int nv10_graph_create_context(struct nouveau_channel *chan) {
 
 	NV_DEBUG(dev, "nv10_graph_context_create %d\n", chan->id);
 
-	chan->pgraph_ctx = pgraph_ctx = drm_calloc(1, sizeof(*pgraph_ctx),
-					      DRM_MEM_DRIVER);
-
+	chan->pgraph_ctx = pgraph_ctx = kzalloc(sizeof(*pgraph_ctx),
+						GFP_KERNEL);
 	if (pgraph_ctx == NULL)
 		return -ENOMEM;
 
@@ -834,7 +833,7 @@ void nv10_graph_destroy_context(struct nouveau_channel *chan)
 	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
 	int chid;
 
-	drm_free(pgraph_ctx, sizeof(*pgraph_ctx), DRM_MEM_DRIVER);
+	kfree(pgraph_ctx);
 	chan->pgraph_ctx = NULL;
 
 	chid = (nv_rd32(NV10_PGRAPH_CTX_USER) >> 24) & (engine->fifo.channels - 1);

@@ -44,7 +44,6 @@
 #include "ttm/ttm_bo_driver.h"
 #include "ttm/ttm_fence_driver.h"
 #include "ttm/ttm_placement_common.h"
-#include "ttm/ttm_execbuf_util.h"
 
 struct nouveau_fpriv {
 	struct ttm_object_file *tfile;
@@ -71,9 +70,10 @@ struct nouveau_fpriv {
 #define NV50_VM_VRAM_NR  (NV50_VM_MAX_VRAM / NV50_VM_BLOCK)
 
 struct nouveau_bo {
-	struct ttm_validate_buffer validate;
 	struct ttm_buffer_object bo;
 	struct ttm_bo_kmap_obj kmap;
+
+	struct list_head entry;
 
 	struct nouveau_channel *channel;
 
@@ -165,12 +165,19 @@ struct nouveau_channel
 	struct drm_file *file_priv;
 	/* mapping of the fifo itself */
 	struct drm_local_map *map;
+
 	/* mapping of the regs controling the fifo */
 	struct drm_local_map *user;
+	uint32_t user_get;
+	uint32_t user_put;
 
 	/* Fencing */
-	uint32_t next_sequence;
-	uint32_t last_sequence_irq;
+	struct {
+		struct list_head pending;
+		uint32_t sequence;
+		uint32_t sequence_ack;
+		uint32_t last_sequence_irq;
+	} fence;
 
 	/* DMA push buffer */
 	struct nouveau_gpuobj_ref *pushbuf;
@@ -295,14 +302,13 @@ struct nouveau_engine {
 };
 
 struct nv50_evo_channel {
+	struct nouveau_channel chan;
 	struct nouveau_bo *ramin;
 	uint32_t *data;
 	uint32_t offset;
 	uint32_t hashtab;
 	uint32_t pushbuf;
 	uint32_t objects;
-	uint32_t max;
-	uint32_t put;
 };
 
 struct nouveau_pll_vals {
@@ -424,6 +430,8 @@ struct drm_nouveau_private {
 	struct drm_local_map *fb;
 	struct drm_local_map *ramin_map;
 	struct drm_local_map *ramin;
+
+	struct work_struct irq_work;
 
 	struct {
 		struct drm_global_reference mem_global_ref;
@@ -845,10 +853,19 @@ extern int nv04_crtc_create(struct drm_device *, int index);
 extern struct ttm_bo_driver nouveau_bo_driver;
 
 /* nouveau_fence.c */
-extern int nouveau_fence_ttm_device_init(struct drm_device *dev);
+struct nouveau_fence;
+extern int nouveau_fence_init(struct nouveau_channel *);
+extern void nouveau_fence_fini(struct nouveau_channel *);
+extern int nouveau_fence_new(struct nouveau_channel *, struct nouveau_fence **,
+			     bool emit);
+extern int nouveau_fence_emit(struct nouveau_fence *);
+struct nouveau_channel *nouveau_fence_channel(struct nouveau_fence *);
+extern bool nouveau_fence_signalled(void *obj, void *arg);
+extern int nouveau_fence_wait(void *obj, void *arg, bool lazy, bool intr);
+extern int nouveau_fence_flush(void *obj, void *arg);
+extern void nouveau_fence_unref(void **obj);
+extern void *nouveau_fence_ref(void *obj);
 extern void nouveau_fence_handler(struct drm_device *dev, int channel);
-extern struct nouveau_channel *
-nouveau_fence_channel(struct drm_device *dev, uint32_t fence_class);
 
 /* nouveau_gem.c */
 extern int nouveau_gem_object_new(struct drm_gem_object *);

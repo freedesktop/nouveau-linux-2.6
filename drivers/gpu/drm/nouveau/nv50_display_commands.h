@@ -89,6 +89,7 @@
 	#define NV50_CRTC0_DEPTH_15BPP	0xE900
 	#define NV50_CRTC0_DEPTH_16BPP	0xE800
 	#define NV50_CRTC0_DEPTH_24BPP	0xCF00
+	#define NV50_CRTC0_DEPTH_30BPP	0xD100
 
 /* I'm openminded to better interpretations. */
 /* This is an educated guess. */
@@ -162,6 +163,7 @@
 	#define NV50_CRTC1_DEPTH_15BPP	0xE900
 	#define NV50_CRTC1_DEPTH_16BPP	0xE800
 	#define NV50_CRTC1_DEPTH_24BPP	0xCF00
+	#define NV50_CRTC1_DEPTH_30BPP	0xD100
 
 /* I'm openminded to better interpretations. */
 #define NV50_CRTC1_BLANK_CTRL		0xC74

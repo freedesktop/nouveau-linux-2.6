@@ -274,8 +274,8 @@ nouveau_fifo_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	if (channel == engine->fifo.channels)
 		return -EINVAL;
 
-	dev_priv->fifos[channel] = drm_calloc(1, sizeof(struct nouveau_channel),
-					      DRM_MEM_DRIVER);
+	dev_priv->fifos[channel] = kzalloc(sizeof(struct nouveau_channel),
+					   GFP_KERNEL);
 	if (!dev_priv->fifos[channel])
 		return -ENOMEM;
 	dev_priv->fifo_alloc_count++;
@@ -314,6 +314,8 @@ nouveau_fifo_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 		nouveau_fifo_free(chan);
 		return ret;
 	}
+	chan->user_put = 0x40;
+	chan->user_get = 0x44;
 
 	/* Allocate space for per-channel fixed notifier memory */
 	ret = nouveau_notifier_init_channel(chan);
@@ -365,8 +367,8 @@ nouveau_fifo_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	/* setup channel's default get/put values
 	 * XXX: quite possibly extremely pointless..
 	 */
-	nvchan_wr32(0x44, chan->pushbuf_base);
-	nvchan_wr32(0x40, chan->pushbuf_base);
+	nvchan_wr32(chan->user_get, chan->pushbuf_base);
+	nvchan_wr32(chan->user_put, chan->pushbuf_base);
 
 	/* If this is the first channel, setup PFIFO ourselves.  For any
 	 * other case, the GPU will handle this when it switches contexts.
@@ -398,6 +400,8 @@ nouveau_fifo_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	engine->graph.fifo_access(dev, true);
 
 	ret = nouveau_dma_init(chan);
+	if (!ret)
+		ret = nouveau_fence_init(chan);
 	if (ret) {
 		nouveau_fifo_free(chan);
 		return ret;
@@ -477,15 +481,12 @@ void nouveau_fifo_free(struct nouveau_channel *chan)
 	 * the channel.
 	 */
 	if (!timeout) {
-		struct ttm_fence_object *fence = NULL;
+		struct nouveau_fence *fence = NULL;
 
-		ret = ttm_fence_object_create(&dev_priv->ttm.fdev, chan->id,
-					      TTM_FENCE_TYPE_EXE,
-					      TTM_FENCE_FLAG_EMIT, &fence);
+		ret = nouveau_fence_new(chan, &fence, true);
 		if (ret == 0) {
-			ret = ttm_fence_object_wait(fence, 0, 1,
-						    TTM_FENCE_TYPE_EXE);
-			ttm_fence_object_unref(&fence);
+			ret = nouveau_fence_wait(fence, NULL, false, false);
+			nouveau_fence_unref((void *)&fence);
 		}
 
 		if (ret) {
@@ -499,8 +500,7 @@ void nouveau_fifo_free(struct nouveau_channel *chan)
 	 * above attempts at idling were OK, but if we failed this'll tell TTM
 	 * we're done with the buffers.
 	 */
-	ttm_fence_handler(&dev_priv->ttm.fdev, chan->id, chan->next_sequence,
-			  TTM_FENCE_TYPE_EXE, 0);
+	nouveau_fence_fini(chan);
 
 	/* disable the fifo caches */
 	nv_wr32(NV03_PFIFO_CACHES, 0x00000000);
@@ -536,7 +536,7 @@ void nouveau_fifo_free(struct nouveau_channel *chan)
 
 	dev_priv->fifos[chan->id] = NULL;
 	dev_priv->fifo_alloc_count--;
-	drm_free(chan, sizeof(*chan), DRM_MEM_DRIVER);
+	kfree(chan);
 }
 
 /* cleanups all the fifos from file_priv */

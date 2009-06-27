@@ -36,17 +36,25 @@
 #include "nv50_display_commands.h"
 
 extern int nouveau_duallink;
-extern int nouveau_uscript;
 
 static void
 nv50_sor_disconnect(struct nouveau_encoder *encoder)
 {
 	struct drm_device *dev = encoder->base.dev;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_channel *evo = &dev_priv->evo.chan;
 	uint32_t offset = encoder->or * 0x40;
+	int ret;
 
 	NV_DEBUG(dev, "Disconnecting SOR %d\n", encoder->or);
 
-	OUT_MODE(NV50_SOR0_MODE_CTRL + offset, NV50_SOR_MODE_CTRL_OFF);
+	ret = RING_SPACE(evo, 2);
+	if (ret) {
+		NV_ERROR(dev, "no space while disconnecting SOR\n");
+		return;
+	}
+	BEGIN_RING(evo, 0, NV50_SOR0_MODE_CTRL + offset, 1);
+	OUT_RING  (evo, NV50_SOR_MODE_CTRL_OFF);
 }
 
 static int
@@ -55,22 +63,12 @@ nv50_sor_set_clock_mode(struct nouveau_encoder *encoder,
 {
 	struct drm_device *dev = encoder->base.dev;
 	uint32_t limit = encoder->dcb->type == OUTPUT_LVDS ? 112000 : 165000;
-	int ret;
 
 	NV_DEBUG(dev, "or %d\n", encoder->or);
 
 	/* We don't yet know what to do, if anything at all. */
-	if (!nouveau_uscript && encoder->dcb->type == OUTPUT_LVDS)
+	if (encoder->dcb->type == OUTPUT_LVDS)
 		return 0;
-
-	if (nouveau_uscript) {
-		NV_TRACE(dev, "executing display table for %d %d %d %d\n",
-			 encoder->dcb->type, encoder->dcb->location,
-			 encoder->dcb->or, mode->clock);
-		ret = nouveau_bios_run_display_table(dev, encoder->dcb, mode->clock);
-		if (ret)
-			NV_ERROR(dev, "error running display table, may hang\n");
-	}
 
 	/* 0x70000 was a late addition to nv, mentioned as fixing tmds
 	 * initialisation on certain gpu's. I presume it's some kind of
@@ -180,13 +178,21 @@ static void nv50_sor_mode_set(struct drm_encoder *drm_encoder,
 			      struct drm_display_mode *mode,
 			      struct drm_display_mode *adjusted_mode)
 {
+	struct drm_nouveau_private *dev_priv = drm_encoder->dev->dev_private;
+	struct nouveau_channel *evo = &dev_priv->evo.chan;
 	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
 	struct drm_device *dev = drm_encoder->dev;
 	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_encoder->crtc);
 	uint32_t offset = encoder->or * 0x40;
 	uint32_t mode_ctl = NV50_SOR_MODE_CTRL_OFF;
+	int ret;
 
 	NV_DEBUG(dev, "or %d\n", encoder->or);
+
+	ret = dev_priv->in_modeset;
+	dev_priv->in_modeset = false;
+	nv50_sor_dpms(drm_encoder, DRM_MODE_DPMS_ON);
+	dev_priv->in_modeset = ret;
 
 	if (encoder->base.encoder_type == DRM_MODE_ENCODER_LVDS) {
 		mode_ctl |= NV50_SOR_MODE_CTRL_LVDS;
@@ -207,7 +213,13 @@ static void nv50_sor_mode_set(struct drm_encoder *drm_encoder,
 	if (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC)
 		mode_ctl |= NV50_SOR_MODE_CTRL_NVSYNC;
 
-	OUT_MODE(NV50_SOR0_MODE_CTRL + offset, mode_ctl);
+	ret = RING_SPACE(evo, 2);
+	if (ret) {
+		NV_ERROR(dev, "no space while connecting SOR\n");
+		return;
+	}
+	BEGIN_RING(evo, 0, NV50_SOR0_MODE_CTRL + offset, 1);
+	OUT_RING  (evo, mode_ctl);
 }
 
 static const struct drm_encoder_helper_funcs nv50_sor_helper_funcs = {
@@ -242,6 +254,7 @@ static const struct drm_encoder_funcs nv50_sor_encoder_funcs = {
 int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry)
 {
 	struct nouveau_encoder *encoder = NULL;
+	bool dum;
 	int type;
 
 	NV_DEBUG(dev, "\n");
@@ -254,6 +267,11 @@ int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry)
 	case OUTPUT_LVDS:
 		NV_INFO(dev, "Detected a LVDS output\n");
 		type = DRM_MODE_ENCODER_LVDS;
+
+		if (nouveau_bios_parse_lvds_table(dev, 0, &dum, &dum)) {
+			NV_ERROR(dev, "Failed parsing LVDS table\n");
+			return -EINVAL;
+		}
 		break;
 	default:
 		return -EINVAL;

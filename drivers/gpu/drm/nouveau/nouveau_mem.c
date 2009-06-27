@@ -44,7 +44,7 @@ split_block(struct mem_block *p, uint64_t start, uint64_t size,
 	/* Maybe cut off the start of an existing block */
 	if (start > p->start) {
 		struct mem_block *newblock =
-			drm_alloc(sizeof(*newblock), DRM_MEM_BUFS);
+			kmalloc(sizeof(*newblock), GFP_KERNEL);
 		if (!newblock)
 			goto out;
 		newblock->start = start;
@@ -61,7 +61,7 @@ split_block(struct mem_block *p, uint64_t start, uint64_t size,
 	/* Maybe cut off the end of an existing block */
 	if (size < p->size) {
 		struct mem_block *newblock =
-			drm_alloc(sizeof(*newblock), DRM_MEM_BUFS);
+			kmalloc(sizeof(*newblock), GFP_KERNEL);
 		if (!newblock)
 			goto out;
 		newblock->start = start + size;
@@ -123,7 +123,7 @@ void nouveau_mem_free_block(struct mem_block *p)
 		p->size += q->size;
 		p->next = q->next;
 		p->next->prev = p;
-		drm_free(q, sizeof(*q), DRM_MEM_BUFS);
+		kfree(q);
 	}
 
 	if (p->prev->file_priv == 0) {
@@ -131,7 +131,7 @@ void nouveau_mem_free_block(struct mem_block *p)
 		q->size += p->size;
 		q->next = p->next;
 		q->next->prev = q;
-		drm_free(p, sizeof(*q), DRM_MEM_BUFS);
+		kfree(p);
 	}
 }
 
@@ -140,14 +140,14 @@ void nouveau_mem_free_block(struct mem_block *p)
 int nouveau_mem_init_heap(struct mem_block **heap, uint64_t start,
 			  uint64_t size)
 {
-	struct mem_block *blocks = drm_alloc(sizeof(*blocks), DRM_MEM_BUFS);
+	struct mem_block *blocks = kmalloc(sizeof(*blocks), GFP_KERNEL);
 
 	if (!blocks)
 		return -ENOMEM;
 
-	*heap = drm_alloc(sizeof(**heap), DRM_MEM_BUFS);
+	*heap = kmalloc(sizeof(**heap), GFP_KERNEL);
 	if (!*heap) {
-		drm_free(blocks, sizeof(*blocks), DRM_MEM_BUFS);
+		kfree(blocks);
 		return -ENOMEM;
 	}
 
@@ -187,7 +187,7 @@ void nouveau_mem_release(struct drm_file *file_priv, struct mem_block *heap)
 			p->size += q->size;
 			p->next = q->next;
 			p->next->prev = p;
-			drm_free(q, sizeof(*q), DRM_MEM_DRIVER);
+			kfree(q);
 		}
 	}
 }
@@ -273,10 +273,10 @@ void nouveau_mem_takedown(struct mem_block **heap)
 	for (p = (*heap)->next; p != *heap;) {
 		struct mem_block *q = p;
 		p = p->next;
-		drm_free(q, sizeof(*q), DRM_MEM_DRIVER);
+		kfree(q);
 	}
 
-	drm_free(*heap, sizeof(**heap), DRM_MEM_DRIVER);
+	kfree(*heap);
 	*heap = NULL;
 }
 
@@ -289,7 +289,6 @@ void nouveau_mem_close(struct drm_device *dev)
 	ttm_bo_clean_mm(&dev_priv->ttm.bdev, TTM_PL_VRAM);
 
 	ttm_bo_device_release(&dev_priv->ttm.bdev);
-	ttm_fence_device_release(&dev_priv->ttm.fdev);
 	ttm_object_device_release(&dev_priv->ttm.tdev);
 
 	nouveau_ttm_global_release(dev_priv);
@@ -461,12 +460,6 @@ nouveau_mem_init(struct drm_device *dev)
 	if (dev_priv->ttm.tdev == NULL) {
 		NV_ERROR(dev, "Error initialising ttm device\n");
 		return -ENOMEM;
-	}
-
-	ret = nouveau_fence_ttm_device_init(dev);
-	if (ret) {
-		NV_ERROR(dev, "Error initialising fence driver: %d\n", ret);
-		return ret;
 	}
 
 	ret = ttm_bo_device_init(&dev_priv->ttm.bdev,
