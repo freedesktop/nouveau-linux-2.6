@@ -5,7 +5,24 @@ NOTE: An old kernel may contain bugs that affect your experience.
 An example is I2C, which may fail to retrieve monitor EDID information.
 
 
-Building the modules:
+There are two ways to build your modules:
+
+
+
+			1. Out-of-tree build
+
+The out-of-tree build should be easy:
+
+$ cd nouveau
+$ make
+
+This will build drm.ko, ttm.ko and nouveau.ko. It is impossible to make
+them built-in this way. You also need to make sure all the kernel config
+dependencies are met. See nouveau/DEPENDS.
+
+
+
+	2. Building the modules as an updated part of your kernel sources
 
 Go into your host kernel tree, and replace two directories with symlinks
 into this new patched kernel tree:
