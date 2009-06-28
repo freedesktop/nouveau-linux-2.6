@@ -40,7 +40,10 @@ DRMCFG := \
 
 MYPARMS := -C $(LINUXDIR) KCPPFLAGS="$(DRMINC)" SUBDIRS="$(DRMDIR)" $(DRMCFG)
 
+.PHONY: all modules install clean archive FORCE
+
 all: modules
+FORCE:
 
 modules:
 	$(MAKE) $(MYPARMS) modules
@@ -50,3 +53,16 @@ install:
 
 clean:
 	$(MAKE) $(MYPARMS) clean
+
+archive: newttm-devel-compat.tar.gz
+
+newttm-devel-compat.tar.gz: EXTRAS=nouveau README-nouveau
+
+%.tar.gz: FORCE
+	(cd $(NOUVEAUROOTDIR) && \
+	git archive --format=tar --prefix=$*/ $* \
+		drivers/gpu/drm include/drm $(EXTRAS) | \
+		gzip -9) > $@
+
+# The commit id of the archive can be read with
+# $ zcat foo.tar.gz | git get-tar-commit-id
