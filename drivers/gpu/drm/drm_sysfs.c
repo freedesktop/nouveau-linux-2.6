@@ -15,6 +15,7 @@
 #include <linux/device.h>
 #include <linux/kdev_t.h>
 #include <linux/err.h>
+#include <linux/version.h>
 
 #include "drm_core.h"
 #include "drmP.h"
@@ -106,7 +107,11 @@ struct class *drm_sysfs_create(struct module *owner, char *name)
 	if (err)
 		goto err_out_class;
 
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,30))
 	class->nodename = drm_nodename;
+#else
+	(void)drm_nodename;
+#endif
 
 	return class;
 
