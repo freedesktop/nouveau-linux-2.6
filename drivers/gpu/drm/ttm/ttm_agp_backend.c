@@ -37,6 +37,7 @@
 #include <linux/module.h>
 #include <linux/io.h>
 #include <asm/agp.h>
+#include <linux/version.h>
 
 struct ttm_agp_backend {
 	struct ttm_backend backend;
@@ -63,7 +64,12 @@ static int ttm_agp_populate(struct ttm_backend *backend,
 		if (!page)
 			page = dummy_read_page;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31))
+		mem->memory[mem->page_count++] =
+					phys_to_gart(page_to_phys(page));
+#else
 		mem->pages[mem->page_count++] = page;
+#endif
 	}
 	agp_be->mem = mem;
 	return 0;

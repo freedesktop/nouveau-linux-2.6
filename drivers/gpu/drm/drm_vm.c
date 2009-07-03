@@ -145,14 +145,22 @@ static int drm_do_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 		 * Get the page, inc the use count, and return it
 		 */
 		offset = (baddr - agpmem->bound) >> PAGE_SHIFT;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31))
+		page = virt_to_page(__va(agpmem->memory->memory[offset]));
+#else
 		page = agpmem->memory->pages[offset];
+#endif
 		get_page(page);
 		vmf->page = page;
 
 		DRM_DEBUG
 		    ("baddr = 0x%llx page = 0x%p, offset = 0x%llx, count=%d\n",
 		     (unsigned long long)baddr,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31))
+		      __va(agpmem->memory->memory[offset]),
+#else
 		     agpmem->memory->pages[offset],
+#endif
 		     (unsigned long long)offset,
 		     page_count(page));
 		return 0;

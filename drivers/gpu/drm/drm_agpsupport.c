@@ -33,6 +33,7 @@
 
 #include "drmP.h"
 #include <linux/module.h>
+#include <linux/version.h>
 
 #if __OS_HAS_AGP
 
@@ -482,7 +483,11 @@ drm_agp_bind_pages(struct drm_device *dev,
 	}
 
 	for (i = 0; i < num_pages; i++)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31))
+		mem->memory[i] = phys_to_gart(page_to_phys(pages[i]));
+#else
 		mem->pages[i] = pages[i];
+#endif
 	mem->page_count = num_pages;
 
 	mem->is_flushed = true;

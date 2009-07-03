@@ -35,6 +35,7 @@
 
 #include <linux/highmem.h>
 #include "drmP.h"
+#include <linux/version.h>
 
 /**
  * Called when "/proc/dri/%dev%/mem" is read.
@@ -90,9 +91,21 @@ static void *agp_remap(unsigned long offset, unsigned long size,
 	if (!page_map)
 		return NULL;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31))
+	(void)phys_page_map;
+	{
+		unsigned long *phys_addr_map =
+			agpmem->memory->memory +
+			(offset - agpmem->bound) / PAGE_SIZE;
+		for (i = 0; i < num_pages; ++i)
+			page_map[i] = pfn_to_page(
+					phys_addr_map[i] >> PAGE_SHIFT);
+	}
+#else
 	phys_page_map = (agpmem->memory->pages + (offset - agpmem->bound) / PAGE_SIZE);
 	for (i = 0; i < num_pages; ++i)
 		page_map[i] = phys_page_map[i];
+#endif
 	addr = vmap(page_map, num_pages, VM_IOREMAP, PAGE_AGP);
 	vfree(page_map);
 
