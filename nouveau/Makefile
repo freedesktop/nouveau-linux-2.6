@@ -32,7 +32,7 @@ $(error $(NOUVEAUROOTDIR) does not look like the right kernel tree, \
 endif
 
 GIT_REVISION := $(shell GIT_DIR=$(NOUVEAUROOTDIR)/.git \
-	git describe --abbrev=17 2> /dev/null)
+	git describe --always --abbrev=17 2> /dev/null)
 
 DRMINC := -I$(NOUVEAUROOTDIR)/include/drm
 DRMDIR := $(NOUVEAUROOTDIR)/drivers/gpu/drm
