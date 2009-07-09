@@ -41,44 +41,6 @@
 #include "nouveau_connector.h"
 #include "nv50_display.h"
 
-extern int nouveau_uscript;
-
-static void
-nv50_irq_work_handler(struct work_struct *work)
-{
-	struct drm_nouveau_private *dev_priv =
-		container_of(work, struct drm_nouveau_private, irq_work);
-	struct drm_device *dev = dev_priv->dev;
-	uint32_t status = 0;
-	int count = 0;
-
-	while (count++ < 100) {
-		status  = nv_rd32(NV03_PMC_INTR_0);
-		status &= (NV_PMC_INTR_0_NV50_DISPLAY_PENDING |
-			   NV_PMC_INTR_0_NV50_I2C_PENDING);
-		if (!status)
-			break;
-
-		if (status & NV_PMC_INTR_0_NV50_DISPLAY_PENDING) {
-			if (nouveau_uscript == 1)
-				nv50_display_irq_handler(dev);
-			else
-				nv50_display_irq_handler_old(dev);
-		}
-
-		if (status & NV_PMC_INTR_0_NV50_I2C_PENDING) {
-			NV_DEBUG(dev, "HOTPLUG_CTRL: 0x%08x\n",
-				 nv_rd32(NV50_PCONNECTOR_HOTPLUG_CTRL));
-			nv_wr32(NV50_PCONNECTOR_HOTPLUG_CTRL, 0x7fff7fff);
-		}
-	}
-
-	if (status)
-		NV_ERROR(dev, "display irqs still pending: 0x%08x\n", status);
-
-	nv_wr32(NV03_PMC_INTR_EN_0, NV_PMC_INTR_EN_0_MASTER_ENABLE);
-}
-
 void
 nouveau_irq_preinstall(struct drm_device *dev)
 {
@@ -88,7 +50,7 @@ nouveau_irq_preinstall(struct drm_device *dev)
 	nv_wr32(NV03_PMC_INTR_EN_0, 0);
 
 	if (dev_priv->card_type == NV_50)
-		INIT_WORK(&dev_priv->irq_work, nv50_irq_work_handler);
+		INIT_WORK(&dev_priv->irq_work, nv50_display_irq_handler_bh);
 }
 
 int
@@ -126,7 +88,14 @@ nouveau_fifo_irq_handler(struct drm_device *dev)
 			uint32_t mthd, data;
 			int ptr;
 
-			ptr = get >> 2;
+			/* NV_PFIFO_CACHE1_GET actually goes to 0xffc before
+			 * wrapping on my G80 chips, but CACHE1 isn't big
+			 * enough for this much data.. Tests show that it
+			 * wraps around to the start at GET=0x800.. No clue
+			 * as to why..
+			 */
+			ptr = (get & 0x7ff) >> 2;
+
 			if (dev_priv->card_type < NV_40) {
 				mthd = nv_rd32(NV04_PFIFO_CACHE1_METHOD(ptr));
 				data = nv_rd32(NV04_PFIFO_CACHE1_DATA(ptr));
@@ -603,8 +572,7 @@ nouveau_irq_handler(DRM_IRQ_ARGS)
 
 	if (status & (NV_PMC_INTR_0_NV50_DISPLAY_PENDING |
 		      NV_PMC_INTR_0_NV50_I2C_PENDING)) {
-		nv_wr32(NV03_PMC_INTR_EN_0, 0);
-		schedule_work(&dev_priv->irq_work);
+		nv50_display_irq_handler(dev);
 		status &= ~(NV_PMC_INTR_0_NV50_DISPLAY_PENDING |
 			    NV_PMC_INTR_0_NV50_I2C_PENDING);
 	}

@@ -49,10 +49,10 @@ static int crtchead = 0;
 /* this will need remembering across a suspend */
 static uint32_t saved_nv_pfb_cfg0;
 
-typedef struct {
+struct init_exec {
 	bool execute;
 	bool repeat;
-} init_exec_t;
+};
 
 static bool nv_cksum(const uint8_t *data, unsigned int length)
 {
@@ -239,22 +239,22 @@ static bool NVShadowVBIOS(struct drm_device *dev, uint8_t *data)
 	return false;
 }
 
-typedef struct {
+struct init_tbl_entry {
 	char* name;
 	uint8_t id;
 	int length;
 	int length_offset;
 	int length_multiplier;
-	bool (*handler)(struct drm_device *dev, struct nvbios *, uint16_t, init_exec_t *);
-} init_tbl_entry_t;
+	bool (*handler)(struct drm_device *dev, struct nvbios *, uint16_t, struct init_exec *);
+};
 
-typedef struct {
+struct bit_entry {
 	uint8_t id[2];
 	uint16_t length;
 	uint16_t offset;
-} bit_entry_t;
+};
 
-static int parse_init_table(struct drm_device *dev, struct nvbios *bios, unsigned int offset, init_exec_t *iexec);
+static int parse_init_table(struct drm_device *dev, struct nvbios *bios, unsigned int offset, struct init_exec *iexec);
 
 #define MACRO_INDEX_SIZE	2
 #define MACRO_SIZE		8
@@ -326,9 +326,9 @@ static int valid_reg(struct drm_device *dev, uint32_t reg)
 		/* No clue what they do, but because they are outside normal
 		 * ranges we'd better list them seperately. */
 		if (reg == 0x00020018 || reg == 0x0002004C ||
-		    reg == 0x00020060 || reg == 0x00021218 ||
-		    reg == 0x0002130C || reg == 0x00089008 ||
-		    reg == 0x00089028)
+		    reg == 0x00020060 || reg == 0x00021028 ||
+		    reg == 0x00021218 || reg == 0x0002130C ||
+		    reg == 0x00089008 || reg == 0x00089028)
 			return 1;
 	}
 	if (WITHIN(reg,NV_PFB_OFFSET,NV_PFB_SIZE))
@@ -700,7 +700,7 @@ static uint32_t get_tmds_index_reg(struct drm_device *dev, uint8_t mlv)
 	}
 }
 
-static bool init_io_restrict_prog(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_io_restrict_prog(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_IO_RESTRICT_PROG   opcode: 0x32 ('2')
 	 *
@@ -752,7 +752,7 @@ static bool init_io_restrict_prog(struct drm_device *dev, struct nvbios *bios, u
 	return true;
 }
 
-static bool init_repeat(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_repeat(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_REPEAT   opcode: 0x33 ('3')
 	 *
@@ -786,7 +786,7 @@ static bool init_repeat(struct drm_device *dev, struct nvbios *bios, uint16_t of
 	return true;
 }
 
-static bool init_io_restrict_pll(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_io_restrict_pll(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_IO_RESTRICT_PLL   opcode: 0x34 ('4')
 	 *
@@ -850,7 +850,7 @@ static bool init_io_restrict_pll(struct drm_device *dev, struct nvbios *bios, ui
 	return true;
 }
 
-static bool init_end_repeat(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_end_repeat(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_END_REPEAT   opcode: 0x36 ('6')
 	 *
@@ -870,7 +870,7 @@ static bool init_end_repeat(struct drm_device *dev, struct nvbios *bios, uint16_
 	return true;
 }
 
-static bool init_copy(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_copy(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_COPY   opcode: 0x37 ('7')
 	 *
@@ -916,7 +916,7 @@ static bool init_copy(struct drm_device *dev, struct nvbios *bios, uint16_t offs
 	return true;
 }
 
-static bool init_not(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_not(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_NOT   opcode: 0x38 ('8')
 	 *
@@ -933,7 +933,7 @@ static bool init_not(struct drm_device *dev, struct nvbios *bios, uint16_t offse
 	return true;
 }
 
-static bool init_io_flag_condition(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_io_flag_condition(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_IO_FLAG_CONDITION   opcode: 0x39 ('9')
 	 *
@@ -960,7 +960,7 @@ static bool init_io_flag_condition(struct drm_device *dev, struct nvbios *bios, 
 	return true;
 }
 
-static bool init_idx_addr_latched(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_idx_addr_latched(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_INDEX_ADDRESS_LATCHED   opcode: 0x49 ('I')
 	 *
@@ -1007,7 +1007,7 @@ static bool init_idx_addr_latched(struct drm_device *dev, struct nvbios *bios, u
 	return true;
 }
 
-static bool init_io_restrict_pll2(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_io_restrict_pll2(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_IO_RESTRICT_PLL2   opcode: 0x4A ('J')
 	 *
@@ -1063,7 +1063,7 @@ static bool init_io_restrict_pll2(struct drm_device *dev, struct nvbios *bios, u
 	return true;
 }
 
-static bool init_pll2(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_pll2(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_PLL2   opcode: 0x4B ('K')
 	 *
@@ -1088,7 +1088,7 @@ static bool init_pll2(struct drm_device *dev, struct nvbios *bios, uint16_t offs
 	return true;
 }
 
-static bool init_i2c_byte(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_i2c_byte(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_I2C_BYTE   opcode: 0x4C ('L')
 	 *
@@ -1154,7 +1154,7 @@ static bool init_i2c_byte(struct drm_device *dev, struct nvbios *bios, uint16_t 
 	return true;
 }
 
-static bool init_zm_i2c_byte(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_zm_i2c_byte(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_ZM_I2C_BYTE   opcode: 0x4D ('M')
 	 *
@@ -1207,7 +1207,7 @@ static bool init_zm_i2c_byte(struct drm_device *dev, struct nvbios *bios, uint16
 	return true;
 }
 
-static bool init_zm_i2c(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_zm_i2c(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_ZM_I2C   opcode: 0x4E ('N')
 	 *
@@ -1257,7 +1257,7 @@ static bool init_zm_i2c(struct drm_device *dev, struct nvbios *bios, uint16_t of
 	return true;
 }
 
-static bool init_tmds(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_tmds(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_TMDS   opcode: 0x4F ('O')	(non-canon name)
 	 *
@@ -1296,7 +1296,7 @@ static bool init_tmds(struct drm_device *dev, struct nvbios *bios, uint16_t offs
 	return true;
 }
 
-static bool init_zm_tmds_group(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_zm_tmds_group(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_ZM_TMDS_GROUP   opcode: 0x50 ('P')	(non-canon name)
 	 *
@@ -1337,7 +1337,7 @@ static bool init_zm_tmds_group(struct drm_device *dev, struct nvbios *bios, uint
 	return true;
 }
 
-static bool init_cr_idx_adr_latch(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_cr_idx_adr_latch(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_CR_INDEX_ADDRESS_LATCHED   opcode: 0x51 ('Q')
 	 *
@@ -1380,7 +1380,7 @@ static bool init_cr_idx_adr_latch(struct drm_device *dev, struct nvbios *bios, u
 	return true;
 }
 
-static bool init_cr(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_cr(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_CR   opcode: 0x52 ('R')
 	 *
@@ -1410,7 +1410,7 @@ static bool init_cr(struct drm_device *dev, struct nvbios *bios, uint16_t offset
 	return true;
 }
 
-static bool init_zm_cr(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_zm_cr(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_ZM_CR   opcode: 0x53 ('S')
 	 *
@@ -1432,7 +1432,7 @@ static bool init_zm_cr(struct drm_device *dev, struct nvbios *bios, uint16_t off
 	return true;
 }
 
-static bool init_zm_cr_group(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_zm_cr_group(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_ZM_CR_GROUP   opcode: 0x54 ('T')
 	 *
@@ -1457,7 +1457,7 @@ static bool init_zm_cr_group(struct drm_device *dev, struct nvbios *bios, uint16
 	return true;
 }
 
-static bool init_condition_time(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_condition_time(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_CONDITION_TIME   opcode: 0x56 ('V')
 	 *
@@ -1502,7 +1502,7 @@ static bool init_condition_time(struct drm_device *dev, struct nvbios *bios, uin
 	return true;
 }
 
-static bool init_zm_reg_sequence(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_zm_reg_sequence(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_ZM_REG_SEQUENCE   opcode: 0x58 ('X')
 	 *
@@ -1536,7 +1536,7 @@ static bool init_zm_reg_sequence(struct drm_device *dev, struct nvbios *bios, ui
 	return true;
 }
 
-static bool init_sub_direct(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_sub_direct(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_SUB_DIRECT   opcode: 0x5B ('[')
 	 *
@@ -1561,7 +1561,7 @@ static bool init_sub_direct(struct drm_device *dev, struct nvbios *bios, uint16_
 	return true;
 }
 
-static bool init_copy_nv_reg(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_copy_nv_reg(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_COPY_NV_REG   opcode: 0x5F ('_')
 	 *
@@ -1608,7 +1608,7 @@ static bool init_copy_nv_reg(struct drm_device *dev, struct nvbios *bios, uint16
 	return true;
 }
 
-static bool init_zm_index_io(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_zm_index_io(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_ZM_INDEX_IO   opcode: 0x62 ('b')
 	 *
@@ -1631,7 +1631,7 @@ static bool init_zm_index_io(struct drm_device *dev, struct nvbios *bios, uint16
 	return true;
 }
 
-static bool init_compute_mem(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_compute_mem(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_COMPUTE_MEM   opcode: 0x63 ('c')
 	 *
@@ -1685,7 +1685,7 @@ static bool init_compute_mem(struct drm_device *dev, struct nvbios *bios, uint16
 	return true;
 }
 
-static bool init_reset(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_reset(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_RESET   opcode: 0x65 ('e')
 	 *
@@ -1720,7 +1720,7 @@ static bool init_reset(struct drm_device *dev, struct nvbios *bios, uint16_t off
 	return true;
 }
 
-static bool init_configure_mem(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_configure_mem(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_CONFIGURE_MEM   opcode: 0x66 ('f')
 	 *
@@ -1773,7 +1773,7 @@ static bool init_configure_mem(struct drm_device *dev, struct nvbios *bios, uint
 	return true;
 }
 
-static bool init_configure_clk(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_configure_clk(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_CONFIGURE_CLK   opcode: 0x67 ('g')
 	 *
@@ -1803,7 +1803,7 @@ static bool init_configure_clk(struct drm_device *dev, struct nvbios *bios, uint
 	return true;
 }
 
-static bool init_configure_preinit(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_configure_preinit(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_CONFIGURE_PREINIT   opcode: 0x68 ('h')
 	 *
@@ -1827,7 +1827,7 @@ static bool init_configure_preinit(struct drm_device *dev, struct nvbios *bios, 
 	return true;
 }
 
-static bool init_io(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_io(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_IO   opcode: 0x69 ('i')
 	 *
@@ -1854,7 +1854,7 @@ static bool init_io(struct drm_device *dev, struct nvbios *bios, uint16_t offset
 	return true;
 }
 
-static bool init_sub(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_sub(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_SUB   opcode: 0x6B ('k')
 	 *
@@ -1880,7 +1880,7 @@ static bool init_sub(struct drm_device *dev, struct nvbios *bios, uint16_t offse
 	return true;
 }
 
-static bool init_ram_condition(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_ram_condition(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_RAM_CONDITION   opcode: 0x6D ('m')
 	 *
@@ -1914,7 +1914,7 @@ static bool init_ram_condition(struct drm_device *dev, struct nvbios *bios, uint
 	return true;
 }
 
-static bool init_nv_reg(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_nv_reg(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_NV_REG   opcode: 0x6E ('n')
 	 *
@@ -1940,7 +1940,7 @@ static bool init_nv_reg(struct drm_device *dev, struct nvbios *bios, uint16_t of
 	return true;
 }
 
-static bool init_macro(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_macro(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_MACRO   opcode: 0x6F ('o')
 	 *
@@ -1979,7 +1979,7 @@ static bool init_macro(struct drm_device *dev, struct nvbios *bios, uint16_t off
 	return true;
 }
 
-static bool init_done(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_done(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_DONE   opcode: 0x71 ('q')
 	 *
@@ -1992,7 +1992,7 @@ static bool init_done(struct drm_device *dev, struct nvbios *bios, uint16_t offs
 	return false;
 }
 
-static bool init_resume(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_resume(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_RESUME   opcode: 0x72 ('r')
 	 *
@@ -2010,7 +2010,7 @@ static bool init_resume(struct drm_device *dev, struct nvbios *bios, uint16_t of
 	return true;
 }
 
-static bool init_time(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_time(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_TIME   opcode: 0x74 ('t')
 	 *
@@ -2032,7 +2032,7 @@ static bool init_time(struct drm_device *dev, struct nvbios *bios, uint16_t offs
 	return true;
 }
 
-static bool init_condition(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_condition(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_CONDITION   opcode: 0x75 ('u')
 	 *
@@ -2061,7 +2061,7 @@ static bool init_condition(struct drm_device *dev, struct nvbios *bios, uint16_t
 	return true;
 }
 
-static bool init_io_condition(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_io_condition(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_IO_CONDITION  opcode: 0x76
 	 *
@@ -2090,7 +2090,7 @@ static bool init_io_condition(struct drm_device *dev, struct nvbios *bios, uint1
 	return true;
 }
 
-static bool init_index_io(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_index_io(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_INDEX_IO   opcode: 0x78 ('x')
 	 *
@@ -2121,7 +2121,7 @@ static bool init_index_io(struct drm_device *dev, struct nvbios *bios, uint16_t 
 	return true;
 }
 
-static bool init_pll(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_pll(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_PLL   opcode: 0x79 ('y')
 	 *
@@ -2145,7 +2145,7 @@ static bool init_pll(struct drm_device *dev, struct nvbios *bios, uint16_t offse
 	return true;
 }
 
-static bool init_zm_reg(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_zm_reg(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_ZM_REG   opcode: 0x7A ('z')
 	 *
@@ -2167,7 +2167,7 @@ static bool init_zm_reg(struct drm_device *dev, struct nvbios *bios, uint16_t of
 	return true;
 }
 
-static bool init_8e(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_8e(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_8E   opcode: 0x8E ('')
 	 *
@@ -2248,7 +2248,7 @@ static bool init_8e(struct drm_device *dev, struct nvbios *bios, uint16_t offset
 /* hack to avoid moving the itbl_entry array before this function */
 int init_ram_restrict_zm_reg_group_blocklen = 0;
 
-static bool init_ram_restrict_zm_reg_group(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_ram_restrict_zm_reg_group(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_RAM_RESTRICT_ZM_REG_GROUP   opcode: 0x8F ('')
 	 *
@@ -2304,7 +2304,7 @@ static bool init_ram_restrict_zm_reg_group(struct drm_device *dev, struct nvbios
 	return true;
 }
 
-static bool init_copy_zm_reg(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_copy_zm_reg(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_COPY_ZM_REG   opcode: 0x90 ('')
 	 *
@@ -2326,7 +2326,7 @@ static bool init_copy_zm_reg(struct drm_device *dev, struct nvbios *bios, uint16
 	return true;
 }
 
-static bool init_zm_reg_group_addr_latched(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_zm_reg_group_addr_latched(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_ZM_REG_GROUP_ADDRESS_LATCHED   opcode: 0x91 ('')
 	 *
@@ -2354,7 +2354,7 @@ static bool init_zm_reg_group_addr_latched(struct drm_device *dev, struct nvbios
 	return true;
 }
 
-static bool init_reserved(struct drm_device *dev, struct nvbios *bios, uint16_t offset, init_exec_t *iexec)
+static bool init_reserved(struct drm_device *dev, struct nvbios *bios, uint16_t offset, struct init_exec *iexec)
 {
 	/* INIT_RESERVED   opcode: 0x92 ('')
 	 *
@@ -2366,7 +2366,46 @@ static bool init_reserved(struct drm_device *dev, struct nvbios *bios, uint16_t 
 	return true;
 }
 
-static init_tbl_entry_t itbl_entry[] = {
+static bool
+init_96(struct drm_device *dev, struct nvbios *bios, uint16_t offset,
+	struct init_exec *iexec)
+{
+	/* INIT_96   opcode: 0x96 ('')
+	 *
+	 * offset      (8  bit): opcode
+	 * offset + 1  (32 bit): sreg
+	 * offset + 5  (8  bit): sshift
+	 * offset + 6  (8  bit): smask
+	 * offset + 7  (8  bit): index
+	 * offset + 8  (32 bit): reg
+	 * offset + 12 (32 bit): mask
+	 * offset + 16 (8  bit): shift
+	 *
+	 */
+
+	uint16_t xlatptr = bios->init96_tbl_ptr + (bios->data[offset + 7] * 2);
+	uint32_t reg = ROM32(bios->data[offset + 8]);
+	uint32_t mask = ROM32(bios->data[offset + 12]);
+	uint32_t val;
+
+	val = bios_rd32(dev, ROM32(bios->data[offset + 1]));
+	if (bios->data[offset + 5] < 0x80)
+		val >>= bios->data[offset + 5];
+	else
+		val <<= (0x100 - bios->data[offset + 5]);
+	val &= bios->data[offset + 6];
+
+	val   = bios->data[xlatptr + val];
+	val <<= bios->data[offset + 16];
+
+	if (!iexec->execute)
+		return true;
+
+	bios_wr32(dev, reg, (bios_rd32(dev, reg) & mask) | val);
+	return true;
+}
+
+static struct init_tbl_entry itbl_entry[] = {
 	/* command name                       , id  , length  , offset  , mult    , command handler                 */
 	/* INIT_PROG (0x31, 15, 10, 4) removed due to no example of use */
 	{ "INIT_IO_RESTRICT_PROG"             , 0x32, 11      , 6       , 4       , init_io_restrict_prog           },
@@ -2419,6 +2458,7 @@ static init_tbl_entry_t itbl_entry[] = {
 	{ "INIT_COPY_ZM_REG"                  , 0x90, 9       , 0       , 0       , init_copy_zm_reg                },
 	{ "INIT_ZM_REG_GROUP_ADDRESS_LATCHED" , 0x91, 6       , 5       , 4       , init_zm_reg_group_addr_latched  },
 	{ "INIT_RESERVED"                     , 0x92, 1       , 0       , 0       , init_reserved                   },
+	{ "INIT_96"                           , 0x96, 17      , 0       , 0       , init_96                         },
 	{ 0                                   , 0   , 0       , 0       , 0       , 0                               }
 };
 
@@ -2430,7 +2470,7 @@ static unsigned int get_init_table_entry_length(struct nvbios *bios, unsigned in
 
 #define MAX_TABLE_OPS 1000
 
-static int parse_init_table(struct drm_device *dev, struct nvbios *bios, unsigned int offset, init_exec_t *iexec)
+static int parse_init_table(struct drm_device *dev, struct nvbios *bios, unsigned int offset, struct init_exec *iexec)
 {
 	/* Parses all commands in an init table.
 	 *
@@ -2491,7 +2531,7 @@ static void parse_init_tables(struct drm_device *dev, struct nvbios *bios)
 
 	int i = 0;
 	uint16_t table;
-	init_exec_t iexec = {true, false};
+	struct init_exec iexec = {true, false};
 
 	if (bios->old_style_init) {
 		if (bios->init_script_tbls_ptr)
@@ -2566,7 +2606,7 @@ static void run_digital_op_script(struct drm_device *dev, uint16_t scriptptr, st
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nvbios *bios = &dev_priv->VBIOS;
-	init_exec_t iexec = {true, false};
+	struct init_exec iexec = {true, false};
 
 	NV_TRACE(dev, "0x%04X: Parsing digital output script table\n",
 		 scriptptr);
@@ -3090,7 +3130,7 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 	 */
 
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	init_exec_t iexec = {true, false};
+	struct init_exec iexec = {true, false};
 	struct nvbios *bios = &dev_priv->VBIOS;
 	uint8_t *table = &bios->data[bios->display.script_table_ptr];
 	uint8_t *entry, *otable = NULL;
@@ -3642,7 +3682,7 @@ static void parse_script_table_pointers(struct nvbios *bios, uint16_t offset)
 	bios->init_function_tbl_ptr = ROM16(bios->data[offset + 12]);
 }
 
-static int parse_bit_A_tbl_entry(struct drm_device *dev, struct nvbios *bios, bit_entry_t *bitentry)
+static int parse_bit_A_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
 	/* Parses the load detect values for g80 cards.
 	 *
@@ -3687,7 +3727,7 @@ static int parse_bit_A_tbl_entry(struct drm_device *dev, struct nvbios *bios, bi
 	return 0;
 }
 
-static int parse_bit_C_tbl_entry(struct drm_device *dev, struct nvbios *bios, bit_entry_t *bitentry)
+static int parse_bit_C_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
 	/* offset + 8  (16 bits): PLL limits table pointer
 	 *
@@ -3704,7 +3744,7 @@ static int parse_bit_C_tbl_entry(struct drm_device *dev, struct nvbios *bios, bi
 	return 0;
 }
 
-static int parse_bit_display_tbl_entry(struct drm_device *dev, struct nvbios *bios, bit_entry_t *bitentry)
+static int parse_bit_display_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
 	/* Parses the flat panel table segment that the bit entry points to.
 	 * Starting at bitentry->offset:
@@ -3723,7 +3763,7 @@ static int parse_bit_display_tbl_entry(struct drm_device *dev, struct nvbios *bi
 	return 0;
 }
 
-static int parse_bit_init_tbl_entry(struct drm_device *dev, struct nvbios *bios, bit_entry_t *bitentry)
+static int parse_bit_init_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
 	/* Parses the init table segment that the bit entry points to.
 	 *
@@ -3737,10 +3777,13 @@ static int parse_bit_init_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 
 	parse_script_table_pointers(bios, bitentry->offset);
 
+	if (bitentry->length >= 18)
+		bios->init96_tbl_ptr = ROM16(bios->data[bitentry->offset + 16]);
+
 	return 0;
 }
 
-static int parse_bit_i_tbl_entry(struct drm_device *dev, struct nvbios *bios, bit_entry_t *bitentry)
+static int parse_bit_i_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
 	/* BIT 'i' (info?) table
 	 *
@@ -3797,7 +3840,7 @@ static int parse_bit_i_tbl_entry(struct drm_device *dev, struct nvbios *bios, bi
 	return 0;
 }
 
-static int parse_bit_lvds_tbl_entry(struct drm_device *dev, struct nvbios *bios, bit_entry_t *bitentry)
+static int parse_bit_lvds_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
 	/* Parses the LVDS table segment that the bit entry points to.
 	 * Starting at bitentry->offset:
@@ -3816,7 +3859,7 @@ static int parse_bit_lvds_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 	return 0;
 }
 
-static int parse_bit_M_tbl_entry(struct drm_device *dev, struct nvbios *bios, bit_entry_t *bitentry)
+static int parse_bit_M_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
 	/* offset + 2  (8  bits): number of options in an INIT_RAM_RESTRICT_ZM_REG_GROUP opcode option set
 	 * offset + 3  (16 bits): pointer to strap xlate table for RAM restrict option selection
@@ -3842,7 +3885,7 @@ static int parse_bit_M_tbl_entry(struct drm_device *dev, struct nvbios *bios, bi
 	return 0;
 }
 
-static int parse_bit_tmds_tbl_entry(struct drm_device *dev, struct nvbios *bios, bit_entry_t *bitentry)
+static int parse_bit_tmds_tbl_entry(struct drm_device *dev, struct nvbios *bios, struct bit_entry *bitentry)
 {
 	/* Parses the pointer to the TMDS table
 	 *
@@ -3901,7 +3944,7 @@ static int parse_bit_tmds_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 
 static int
 parse_bit_U_tbl_entry(struct drm_device *dev, struct nvbios *bios,
-		      bit_entry_t *bitentry)
+		      struct bit_entry *bitentry)
 {
 	/* Parses the pointer to the G80 output script tables
 	 *
@@ -3924,7 +3967,7 @@ parse_bit_U_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 
 struct bit_table {
 	const char id;
-	int (* const parse_fn)(struct drm_device *, struct nvbios *, bit_entry_t *);
+	int (* const parse_fn)(struct drm_device *, struct nvbios *, struct bit_entry *);
 };
 
 #define BIT_TABLE(id, funcid) ((struct bit_table){ id, parse_bit_##funcid##_tbl_entry })
@@ -3933,7 +3976,7 @@ static int parse_bit_table(struct drm_device *dev, struct nvbios *bios, const ui
 {
 	uint8_t maxentries = bios->data[bitoffset + 4];
 	int i, offset;
-	bit_entry_t bitentry;
+	struct bit_entry bitentry;
 
 	for (i = 0, offset = bitoffset + 6; i < maxentries; i++, offset += 6) {
 		bitentry.id[0] = bios->data[offset];
