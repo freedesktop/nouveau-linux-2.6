@@ -35,7 +35,6 @@
 #include "nouveau_drm.h"
 #include "nouveau_drv.h"
 #include "nouveau_reg.h"
-#include "nouveau_swmthd.h"
 
 /* needed for hotplug irq */
 #include "nouveau_connector.h"
@@ -49,8 +48,10 @@ nouveau_irq_preinstall(struct drm_device *dev)
 	/* Master disable */
 	nv_wr32(NV03_PMC_INTR_EN_0, 0);
 
-	if (dev_priv->card_type == NV_50)
+	if (dev_priv->card_type == NV_50) {
 		INIT_WORK(&dev_priv->irq_work, nv50_display_irq_handler_bh);
+		INIT_LIST_HEAD(&dev_priv->vbl_waiting);
+	}
 }
 
 int
@@ -68,6 +69,65 @@ nouveau_irq_uninstall(struct drm_device *dev)
 	nv_wr32(NV03_PMC_INTR_EN_0, 0);
 }
 
+static int
+nouveau_call_method(struct nouveau_channel *chan, int class, int mthd, int data)
+{
+	struct drm_nouveau_private *dev_priv = chan->dev->dev_private;
+	struct nouveau_pgraph_object_method *grm;
+	struct nouveau_pgraph_object_class *grc;
+
+	grc = dev_priv->engine.graph.grclass;
+	while (grc->id) {
+		if (grc->id == class)
+			break;
+		grc++;
+	}
+
+	if (grc->id != class)
+		return -ENOENT;
+
+	grm = grc->methods;
+	while (grm->id) {
+		if (grm->id == mthd)
+			return grm->exec(chan, class, mthd, data);
+		grm++;
+	}
+
+	return -ENOENT;
+}
+
+static bool
+nouveau_fifo_swmthd(struct nouveau_channel *chan, uint32_t addr, uint32_t data)
+{
+	struct drm_device *dev = chan->dev;
+	const int subc = (addr >> 13) & 0x7;
+	const int mthd = addr & 0x1ffc;
+
+	if (mthd == 0x0000) {
+		struct nouveau_gpuobj_ref *ref = NULL;
+
+		if (nouveau_gpuobj_ref_find(chan, data, &ref))
+			return false;
+
+		if (ref->gpuobj->engine != NVOBJ_ENGINE_SW)
+			return false;
+
+		chan->sw_subchannel[subc] = ref->gpuobj->class;
+		nv_wr32(NV04_PFIFO_CACHE1_ENGINE, nv_rd32(
+			NV04_PFIFO_CACHE1_ENGINE & ~(0xf << subc*4)));
+		return true;
+	}
+
+	/* hw object */
+	if (nv_rd32(NV04_PFIFO_CACHE1_ENGINE) & (1 << subc))
+		return false;
+
+	if (nouveau_call_method(chan, chan->sw_subchannel[subc], mthd, data))
+		return false;
+
+	return true;
+}
+
 static void
 nouveau_fifo_irq_handler(struct drm_device *dev)
 {
@@ -77,11 +137,14 @@ nouveau_fifo_irq_handler(struct drm_device *dev)
 
 	reassign = nv_rd32(NV03_PFIFO_CACHES) & 1;
 	while ((status = nv_rd32(NV03_PFIFO_INTR_0))) {
+		struct nouveau_channel *chan = NULL;
 		uint32_t chid, get;
 
 		nv_wr32(NV03_PFIFO_CACHES, 0);
 
 		chid = engine->fifo.channel_id(dev);
+		if (chid >= 0 && chid < engine->fifo.channels)
+			chan = dev_priv->fifos[chid];
 		get  = nv_rd32(NV03_PFIFO_CACHE1_GET);
 
 		if (status & NV_PFIFO_INTR_CACHE_ERROR) {
@@ -104,15 +167,28 @@ nouveau_fifo_irq_handler(struct drm_device *dev)
 				data = nv_rd32(NV40_PFIFO_CACHE1_DATA(ptr));
 			}
 
-			NV_INFO(dev, "PFIFO_CACHE_ERROR - "
-				     "Ch %d/%d Mthd 0x%04x Data 0x%08x\n",
-				chid, (mthd >> 13) & 7, mthd & 0x1ffc, data);
+			if (!chan || !nouveau_fifo_swmthd(chan, mthd, data)) {
+				NV_INFO(dev, "PFIFO_CACHE_ERROR - Ch %d/%d "
+					     "Mthd 0x%04x Data 0x%08x\n",
+					chid, (mthd >> 13) & 7, mthd & 0x1ffc,
+					data);
+			}
 
+			nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH, 0);
+			nv_wr32(NV03_PFIFO_INTR_0, NV_PFIFO_INTR_CACHE_ERROR);
+
+			nv_wr32(NV03_PFIFO_CACHE1_PUSH0,
+				nv_rd32(NV03_PFIFO_CACHE1_PUSH0) & ~1);
 			nv_wr32(NV03_PFIFO_CACHE1_GET, get + 4);
+			nv_wr32(NV03_PFIFO_CACHE1_PUSH0,
+				nv_rd32(NV03_PFIFO_CACHE1_PUSH0) | 1);
+			nv_wr32(NV04_PFIFO_CACHE1_HASH, 0);
+
+			nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH,
+				nv_rd32(NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
 			nv_wr32(NV04_PFIFO_CACHE1_PULL0, 1);
 
 			status &= ~NV_PFIFO_INTR_CACHE_ERROR;
-			nv_wr32(NV03_PFIFO_INTR_0, NV_PFIFO_INTR_CACHE_ERROR);
 		}
 
 		if (status & NV_PFIFO_INTR_DMA_PUSHER) {
@@ -328,36 +404,32 @@ nouveau_graph_dump_trap_info(struct drm_device *dev, const char *id,
 		 trap->data2, trap->data);
 }
 
+static int
+nouveau_pgraph_intr_swmthd(struct drm_device *dev,
+			   struct nouveau_pgraph_trap *trap)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
+	if (trap->channel < 0 ||
+	    trap->channel >= dev_priv->engine.fifo.channels ||
+	    !dev_priv->fifos[trap->channel])
+		return -ENODEV;
+
+	return nouveau_call_method(dev_priv->fifos[trap->channel],
+				   trap->class, trap->mthd, trap->data);
+}
+
 static inline void
 nouveau_pgraph_intr_notify(struct drm_device *dev, uint32_t nsource)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_channel *chan = NULL;
 	struct nouveau_pgraph_trap trap;
 	int unhandled = 0;
 
 	nouveau_graph_trap_info(dev, &trap);
 
-	if (trap.channel >= 0 && trap.channel < dev_priv->engine.fifo.channels)
-		chan = dev_priv->fifos[trap.channel];
-
 	if (nsource & NV03_PGRAPH_NSOURCE_ILLEGAL_MTHD) {
-		/* NV4 (nvidia TNT 1) reports software methods with
-		 * PGRAPH NOTIFY ILLEGAL_MTHD
-		 */
-		NV_DEBUG(dev, "Got NV04 software method method %x for class %#x\n",
-			  trap.mthd, trap.class);
-
-		if (trap.class == 0x0039 && trap.mthd == 0x0150) {
-			chan->fence.last_sequence_irq = trap.data;
-			nouveau_fence_handler(dev, trap.channel);
-		} else
-		if (nouveau_sw_method_execute(dev, trap.class, trap.mthd)) {
-			NV_ERROR(dev, "Unable to execute NV04 software method "
-				       "%x for class %x. Please report.\n",
-				 trap.mthd, trap.class);
+		if (nouveau_pgraph_intr_swmthd(dev, &trap))
 			unhandled = 1;
-		}
 	} else {
 		unhandled = 1;
 	}
@@ -376,12 +448,8 @@ nouveau_pgraph_intr_error(struct drm_device *dev, uint32_t nsource)
 	trap.nsource = nsource;
 
 	if (nsource & NV03_PGRAPH_NSOURCE_ILLEGAL_MTHD) {
-		if (trap.channel >= 0 && trap.mthd == 0x0150) {
-			nouveau_fence_handler(dev, trap.channel);
-		} else
-		if (nouveau_sw_method_execute(dev, trap.class, trap.mthd)) {
+		if (nouveau_pgraph_intr_swmthd(dev, &trap))
 			unhandled = 1;
-		}
 	} else {
 		unhandled = 1;
 	}

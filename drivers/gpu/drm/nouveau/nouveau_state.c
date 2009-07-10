@@ -58,6 +58,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->timer.takedown	= nv04_timer_takedown;
 		engine->fb.init		= nv04_fb_init;
 		engine->fb.takedown	= nv04_fb_takedown;
+		engine->graph.grclass	= nv04_graph_grclass;
 		engine->graph.init	= nv04_graph_init;
 		engine->graph.takedown	= nv04_graph_takedown;
 		engine->graph.fifo_access	= nv04_graph_fifo_access;
@@ -90,6 +91,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->timer.takedown	= nv04_timer_takedown;
 		engine->fb.init		= nv10_fb_init;
 		engine->fb.takedown	= nv10_fb_takedown;
+		engine->graph.grclass	= nv10_graph_grclass;
 		engine->graph.init	= nv10_graph_init;
 		engine->graph.takedown	= nv10_graph_takedown;
 		engine->graph.create_context	= nv10_graph_create_context;
@@ -122,6 +124,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->timer.takedown	= nv04_timer_takedown;
 		engine->fb.init		= nv10_fb_init;
 		engine->fb.takedown	= nv10_fb_takedown;
+		engine->graph.grclass	= nv20_graph_grclass;
 		engine->graph.init	= nv20_graph_init;
 		engine->graph.takedown	= nv20_graph_takedown;
 		engine->graph.create_context	= nv20_graph_create_context;
@@ -154,6 +157,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->timer.takedown	= nv04_timer_takedown;
 		engine->fb.init		= nv10_fb_init;
 		engine->fb.takedown	= nv10_fb_takedown;
+		engine->graph.grclass	= nv30_graph_grclass;
 		engine->graph.init	= nv30_graph_init;
 		engine->graph.takedown	= nv20_graph_takedown;
 		engine->graph.fifo_access	= nv04_graph_fifo_access;
@@ -187,6 +191,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->timer.takedown	= nv04_timer_takedown;
 		engine->fb.init		= nv40_fb_init;
 		engine->fb.takedown	= nv40_fb_takedown;
+		engine->graph.grclass	= nv40_graph_grclass;
 		engine->graph.init	= nv40_graph_init;
 		engine->graph.takedown	= nv40_graph_takedown;
 		engine->graph.fifo_access	= nv04_graph_fifo_access;
@@ -222,6 +227,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->timer.takedown	= nv04_timer_takedown;
 		engine->fb.init		= nouveau_stub_init;
 		engine->fb.takedown	= nouveau_stub_takedown;
+		engine->graph.grclass	= nv50_graph_grclass;
 		engine->graph.init	= nv50_graph_init;
 		engine->graph.takedown	= nv50_graph_takedown;
 		engine->graph.fifo_access	= nv50_graph_fifo_access;
@@ -536,7 +542,7 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	}
 
 	/* map larger RAMIN aperture on NV40 cards */
-	dev_priv->ramin_map = dev_priv->ramin  = NULL;
+	dev_priv->ramin  = NULL;
 	if (dev_priv->card_type >= NV_40) {
 		int ramin_resource = 2;
 		if (drm_get_resource_len(dev, ramin_resource) == 0)

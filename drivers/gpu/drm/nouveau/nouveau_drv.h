@@ -173,6 +173,8 @@ struct nouveau_channel
 
 	/* Fencing */
 	struct {
+		/* lock protects the pending list only */
+		spinlock_t lock;
 		struct list_head pending;
 		uint32_t sequence;
 		uint32_t sequence_ack;
@@ -224,6 +226,15 @@ struct nouveau_channel
 
 		volatile uint32_t *pushbuf;
 	} dma;
+
+	uint32_t sw_subchannel[8];
+
+	struct {
+		struct nouveau_gpuobj *vblsem;
+		uint32_t vblsem_offset;
+		uint32_t vblsem_rval;
+		struct list_head vbl_wait;
+	} nvsw;
 };
 
 struct nouveau_config {
@@ -280,7 +291,21 @@ struct nouveau_fifo_engine {
 	int  (*save_context)(struct nouveau_channel *);
 };
 
+struct nouveau_pgraph_object_method {
+	int id;
+	int (*exec)(struct nouveau_channel *chan, int grclass, int mthd,
+		      uint32_t data);
+};
+
+struct nouveau_pgraph_object_class {
+	int id;
+	bool software;
+	struct nouveau_pgraph_object_method *methods;
+};
+
 struct nouveau_pgraph_engine {
+	struct nouveau_pgraph_object_class *grclass;
+
 	int  (*init)(struct drm_device *);
 	void (*takedown)(struct drm_device *);
 
@@ -428,10 +453,10 @@ struct drm_nouveau_private {
 
 	struct drm_local_map *mmio;
 	struct drm_local_map *fb;
-	struct drm_local_map *ramin_map;
 	struct drm_local_map *ramin;
 
 	struct work_struct irq_work;
+	struct list_head vbl_waiting;
 
 	struct {
 		struct ttm_global_reference mem_global_ref;
@@ -603,6 +628,7 @@ extern int  nouveau_notifier_init_channel(struct nouveau_channel *);
 extern void nouveau_notifier_takedown_channel(struct nouveau_channel *);
 extern int  nouveau_notifier_alloc(struct nouveau_channel *, uint32_t handle,
 				   int cout, uint32_t *offset);
+extern int  nouveau_notifier_offset(struct nouveau_gpuobj *, uint32_t *);
 extern int  nouveau_ioctl_notifier_alloc(struct drm_device *, void *data,
 					 struct drm_file *);
 extern int  nouveau_ioctl_notifier_free(struct drm_device *, void *data,
@@ -748,6 +774,7 @@ extern int  nv50_fifo_load_context(struct nouveau_channel *);
 extern int  nv50_fifo_save_context(struct nouveau_channel *);
 
 /* nv04_graph.c */
+extern struct nouveau_pgraph_object_class nv04_graph_grclass[];
 extern void nouveau_nv04_context_switch(struct drm_device *);
 extern int  nv04_graph_init(struct drm_device *);
 extern void nv04_graph_takedown(struct drm_device *);
@@ -758,6 +785,7 @@ extern int  nv04_graph_load_context(struct nouveau_channel *);
 extern int  nv04_graph_save_context(struct nouveau_channel *);
 
 /* nv10_graph.c */
+extern struct nouveau_pgraph_object_class nv10_graph_grclass[];
 extern void nouveau_nv10_context_switch(struct drm_device *);
 extern int  nv10_graph_init(struct drm_device *);
 extern void nv10_graph_takedown(struct drm_device *);
@@ -767,6 +795,8 @@ extern int  nv10_graph_load_context(struct nouveau_channel *);
 extern int  nv10_graph_save_context(struct nouveau_channel *);
 
 /* nv20_graph.c */
+extern struct nouveau_pgraph_object_class nv20_graph_grclass[];
+extern struct nouveau_pgraph_object_class nv30_graph_grclass[];
 extern int  nv20_graph_create_context(struct nouveau_channel *);
 extern void nv20_graph_destroy_context(struct nouveau_channel *);
 extern int  nv20_graph_load_context(struct nouveau_channel *);
@@ -776,6 +806,7 @@ extern void nv20_graph_takedown(struct drm_device *);
 extern int  nv30_graph_init(struct drm_device *);
 
 /* nv40_graph.c */
+extern struct nouveau_pgraph_object_class nv40_graph_grclass[];
 extern int  nv40_graph_init(struct drm_device *);
 extern void nv40_graph_takedown(struct drm_device *);
 extern int  nv40_graph_create_context(struct nouveau_channel *);
@@ -784,6 +815,7 @@ extern int  nv40_graph_load_context(struct nouveau_channel *);
 extern int  nv40_graph_save_context(struct nouveau_channel *);
 
 /* nv50_graph.c */
+extern struct nouveau_pgraph_object_class nv50_graph_grclass[];
 extern int  nv50_graph_init(struct drm_device *);
 extern void nv50_graph_takedown(struct drm_device *);
 extern void nv50_graph_fifo_access(struct drm_device *, bool);
@@ -940,8 +972,8 @@ extern int nouveau_gem_ioctl_info(struct drm_device *, void *,
 #define nv_wv32(reg,val) nv_wf32(reg, val)
 
 /* PRAMIN access */
-#define nv_ri32(reg) nv_in32(ramin_map, (reg))
-#define nv_wi32(reg,val) nv_out32(ramin_map, (reg), (val))
+#define nv_ri32(reg) nv_in32(ramin, (reg))
+#define nv_wi32(reg,val) nv_out32(ramin, (reg), (val))
 /* object access */
 #define INSTANCE_RD(o,i) nv_ri32((o)->im_pramin->start + ((i)<<2))
 #define INSTANCE_WR(o,i,v) nv_wi32((o)->im_pramin->start + ((i)<<2), (v))
