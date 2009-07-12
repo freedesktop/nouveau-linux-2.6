@@ -10,8 +10,8 @@ DRM depends on
 	I2C_ALGOBIT
 
 NOUVEAU depends on
-	FB	(for KMS and framebuffer console)
-	FBCON	(for KMS and framebuffer console)
+	FB
+	FRAMEBUFFER_CONSOLE	(for console with KMS)
 	FB_CFB_FILLRECT
 	FB_CFB_COPYAREA
 	FB_CFB_IMAGEBLIT
@@ -19,5 +19,5 @@ NOUVEAU depends on
 For Nouveau, the last three may be a problem, since there is no menuconfig
 entry to enable them. You can get them by enabling another driver, that
 depends on (selects) them, e.g. CONFIG_FB_SAVAGE. It is recommended to
-build FB and FBCON into the kernel if you plan on using KMS.
+build FB and FRAMEBUFFER_CONSOLE into the kernel if you plan on using KMS.
 
