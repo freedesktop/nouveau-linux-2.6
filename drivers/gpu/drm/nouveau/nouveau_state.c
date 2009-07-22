@@ -214,6 +214,8 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 	case 0xA0:
 		engine->instmem.init	= nv50_instmem_init;
 		engine->instmem.takedown= nv50_instmem_takedown;
+		engine->instmem.suspend	= nv50_instmem_suspend;
+		engine->instmem.resume	= nv50_instmem_resume;
 		engine->instmem.populate	= nv50_instmem_populate;
 		engine->instmem.clear		= nv50_instmem_clear;
 		engine->instmem.bind		= nv50_instmem_bind;
@@ -278,6 +280,13 @@ nouveau_card_init(struct drm_device *dev)
 	engine = &dev_priv->engine;
 	dev_priv->init_state = NOUVEAU_CARD_INIT_FAILED;
 
+	/* Parse BIOS tables / Run init tables if card not POSTed */
+	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
+		ret = nouveau_parse_bios(dev);
+		if (ret)
+			return ret;
+	}
+
 	ret = nouveau_gpuobj_early_init(dev);
 	if (ret) return ret;
 
@@ -294,8 +303,6 @@ nouveau_card_init(struct drm_device *dev)
 
 	ret = nouveau_gpuobj_init(dev);
 	if (ret) return ret;
-
-	/* Parse BIOS tables / Run init tables? */
 
 	/* PMC */
 	ret = engine->mc.init(dev);
@@ -360,10 +367,6 @@ nouveau_card_init(struct drm_device *dev)
 	}
 
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
-		ret = nouveau_parse_bios(dev);
-		if (ret)
-			return ret;
-
 		if (dev_priv->card_type >= NV_50) {
 			ret = nv50_display_create(dev);
 			if (ret)
@@ -781,19 +784,15 @@ bool nouveau_wait_until(struct drm_device *dev, uint64_t timeout,
 }
 
 /* Waits for PGRAPH to go completely idle */
-void nouveau_wait_for_idle(struct drm_device *dev)
+bool nouveau_wait_for_idle(struct drm_device *dev)
 {
-	struct drm_nouveau_private *dev_priv=dev->dev_private;
-
-	switch(dev_priv->card_type) {
-	case NV_50:
-		break;
-	default:
-		if (!nv_wait(NV04_PGRAPH_STATUS, 0xffffffff, 0x00000000)) {
-			NV_ERROR(dev, "timed out with status 0x%08x\n",
-				 nv_rd32(NV04_PGRAPH_STATUS));
-		}
+	if (!nv_wait(NV04_PGRAPH_STATUS, 0xffffffff, 0x00000000)) {
+		NV_ERROR(dev, "timed out with status 0x%08x\n",
+			 nv_rd32(NV04_PGRAPH_STATUS));
+		return false;
 	}
+
+	return true;
 }
 
 static int nouveau_suspend(struct drm_device *dev)

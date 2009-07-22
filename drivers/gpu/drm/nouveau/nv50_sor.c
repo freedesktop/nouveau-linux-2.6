@@ -41,7 +41,7 @@ nv50_sor_disconnect(struct nouveau_encoder *encoder)
 {
 	struct drm_device *dev = encoder->base.dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_channel *evo = &dev_priv->evo.chan;
+	struct nouveau_channel *evo = dev_priv->evo;
 	int ret;
 
 	NV_DEBUG(dev, "Disconnecting SOR %d\n", encoder->or);
@@ -55,34 +55,11 @@ nv50_sor_disconnect(struct nouveau_encoder *encoder)
 	OUT_RING  (evo, 0);
 }
 
-static int
-nv50_sor_set_clock_mode(struct nouveau_encoder *encoder,
-			struct drm_display_mode *mode)
-{
-	struct drm_device *dev = encoder->base.dev;
-	uint32_t limit = encoder->dcb->type == OUTPUT_LVDS ? 112000 : 165000;
-
-	NV_DEBUG(dev, "or %d\n", encoder->or);
-
-	/* We don't yet know what to do, if anything at all. */
-	if (encoder->dcb->type == OUTPUT_LVDS)
-		return 0;
-
-	/* 0x70000 was a late addition to nv, mentioned as fixing tmds
-	 * initialisation on certain gpu's. I presume it's some kind of
-	 * clock setting, but what precisely i do not know.
-	 */
-	nv_wr32(NV50_PDISPLAY_SOR_CLK_CTRL2(encoder->or),
-		0x70000 | ((mode->clock > limit) ? 0x101 : 0));
-
-	return 0;
-}
-
 static void nv50_sor_dpms(struct drm_encoder *drm_encoder, int mode)
 {
 	struct drm_device *dev = drm_encoder->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
+	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 	uint32_t val;
 	int or = encoder->or;
 
@@ -94,27 +71,27 @@ static void nv50_sor_dpms(struct drm_encoder *drm_encoder, int mode)
 	}
 
 	/* wait for it to be done */
-	if (!nv_wait(NV50_PDISPLAY_SOR_REGS_DPMS_CTRL(or),
-		     NV50_PDISPLAY_SOR_REGS_DPMS_CTRL_PENDING, 0)) {
+	if (!nv_wait(NV50_PDISPLAY_SOR_DPMS_CTRL(or),
+		     NV50_PDISPLAY_SOR_DPMS_CTRL_PENDING, 0)) {
 		NV_ERROR(dev, "timeout: SOR_DPMS_CTRL_PENDING(%d) == 0\n", or);
 		NV_ERROR(dev, "SOR_DPMS_CTRL(%d) = 0x%08x\n", or,
-			 nv_rd32(NV50_PDISPLAY_SOR_REGS_DPMS_CTRL(or)));
+			 nv_rd32(NV50_PDISPLAY_SOR_DPMS_CTRL(or)));
 	}
 
-	val = nv_rd32(NV50_PDISPLAY_SOR_REGS_DPMS_CTRL(or));
+	val = nv_rd32(NV50_PDISPLAY_SOR_DPMS_CTRL(or));
 
 	if (mode == DRM_MODE_DPMS_ON)
-		val |= NV50_PDISPLAY_SOR_REGS_DPMS_CTRL_ON;
+		val |= NV50_PDISPLAY_SOR_DPMS_CTRL_ON;
 	else
-		val &= ~NV50_PDISPLAY_SOR_REGS_DPMS_CTRL_ON;
+		val &= ~NV50_PDISPLAY_SOR_DPMS_CTRL_ON;
 
-	nv_wr32(NV50_PDISPLAY_SOR_REGS_DPMS_CTRL(or), val |
-		NV50_PDISPLAY_SOR_REGS_DPMS_CTRL_PENDING);
-	if (!nv_wait(NV50_PDISPLAY_SOR_REGS_DPMS_STATE(or),
-		     NV50_PDISPLAY_SOR_REGS_DPMS_STATE_WAIT, 0)) {
+	nv_wr32(NV50_PDISPLAY_SOR_DPMS_CTRL(or), val |
+		NV50_PDISPLAY_SOR_DPMS_CTRL_PENDING);
+	if (!nv_wait(NV50_PDISPLAY_SOR_DPMS_STATE(or),
+		     NV50_PDISPLAY_SOR_DPMS_STATE_WAIT, 0)) {
 		NV_ERROR(dev, "timeout: SOR_DPMS_STATE_WAIT(%d) == 0\n", or);
 		NV_ERROR(dev, "SOR_DPMS_STATE(%d) = 0x%08x\n", or,
-			 nv_rd32(NV50_PDISPLAY_SOR_REGS_DPMS_STATE(or)));
+			 nv_rd32(NV50_PDISPLAY_SOR_DPMS_STATE(or)));
 	}
 }
 
@@ -136,7 +113,7 @@ nouveau_encoder_connector_get(struct nouveau_encoder *encoder)
 
 	list_for_each_entry(drm_connector, &dev->mode_config.connector_list, head) {
 		if (drm_connector->encoder == &encoder->base)
-			return to_nouveau_connector(drm_connector);
+			return nouveau_connector(drm_connector);
 	}
 
 	return NULL;
@@ -146,7 +123,7 @@ static bool nv50_sor_mode_fixup(struct drm_encoder *drm_encoder,
 				struct drm_display_mode *mode,
 				struct drm_display_mode *adjusted_mode)
 {
-	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
+	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 	struct nouveau_connector *connector;
 
 	connector = nouveau_encoder_connector_get(encoder);
@@ -177,10 +154,10 @@ static void nv50_sor_mode_set(struct drm_encoder *drm_encoder,
 			      struct drm_display_mode *adjusted_mode)
 {
 	struct drm_nouveau_private *dev_priv = drm_encoder->dev->dev_private;
-	struct nouveau_channel *evo = &dev_priv->evo.chan;
-	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
+	struct nouveau_channel *evo = dev_priv->evo;
+	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 	struct drm_device *dev = drm_encoder->dev;
-	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_encoder->crtc);
+	struct nouveau_crtc *crtc = nouveau_crtc(drm_encoder->crtc);
 	uint32_t mode_ctl = 0;
 	int ret;
 
@@ -230,7 +207,7 @@ static const struct drm_encoder_helper_funcs nv50_sor_helper_funcs = {
 
 static void nv50_sor_destroy(struct drm_encoder *drm_encoder)
 {
-	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
+	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 
 	NV_DEBUG(drm_encoder->dev, "\n");
 
@@ -281,24 +258,11 @@ int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry)
 
 	encoder->dual_link = nouveau_duallink;
 
-	/* Set function pointers. */
-	encoder->set_clock_mode = nv50_sor_set_clock_mode;
-
 	drm_encoder_init(dev, &encoder->base, &nv50_sor_encoder_funcs, type);
 	drm_encoder_helper_add(&encoder->base, &nv50_sor_helper_funcs);
 
 	encoder->base.possible_crtcs = entry->heads;
 	encoder->base.possible_clones = 0;
-
-	/* Some default state, unknown what it precisely means. */
-	if (encoder->base.encoder_type == DRM_MODE_ENCODER_TMDS) {
-		int or = encoder->or;
-
-		nv_wr32(NV50_PDISPLAY_SOR_REGS_UNK_00C(or), 0x03010700);
-		nv_wr32(NV50_PDISPLAY_SOR_REGS_UNK_010(or), 0x0000152f);
-		nv_wr32(NV50_PDISPLAY_SOR_REGS_UNK_014(or), 0x00000000);
-		nv_wr32(NV50_PDISPLAY_SOR_REGS_UNK_018(or), 0x00245af8);
-	}
 
 	return 0;
 }

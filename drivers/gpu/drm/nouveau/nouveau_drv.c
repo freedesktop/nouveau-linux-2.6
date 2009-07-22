@@ -22,9 +22,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <linux/console.h>
+
 #include "drmP.h"
 #include "drm.h"
+#include "drm_crtc_helper.h"
 #include "nouveau_drv.h"
+#include "nouveau_hw.h"
+#include "nv50_display.h"
 
 #include "drm_pciids.h"
 
@@ -39,10 +44,6 @@ module_param_named(modeset, nouveau_modeset, int, 0400);
 MODULE_PARM_DESC(duallink, "Allow dual-link TMDS (>=GeForce 8)");
 int nouveau_duallink = 1;
 module_param_named(duallink, nouveau_duallink, int, 0400);
-
-MODULE_PARM_DESC(uscript, "Execute output scripts (>=GeForce 8)");
-int nouveau_uscript = 1;
-module_param_named(uscript, nouveau_uscript, int, 0400);
 
 MODULE_PARM_DESC(uscript_lvds, "LVDS output script table ID (>=GeForce 8)");
 int nouveau_uscript_lvds = -1;
@@ -90,19 +91,180 @@ nouveau_pci_remove(struct pci_dev *pdev)
 }
 
 static int
-nouveau_pci_suspend(struct pci_dev *pdev,  pm_message_t state)
+nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 {
 	struct drm_device *dev = pci_get_drvdata(pdev);
-	(void)dev;
-	return -ENODEV;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_engine *engine = &dev_priv->engine;
+	uint32_t fbdev_flags;
+	int ret, i;
+
+	if (!drm_core_check_feature(dev, DRIVER_MODESET))
+		return -ENODEV;
+
+	if (pm_state.event == PM_EVENT_PRETHAW)
+		return 0;
+
+	fbdev_flags = dev_priv->fbdev_info->flags;
+	dev_priv->fbdev_info->flags |= FBINFO_HWACCEL_DISABLED;
+
+	NV_INFO(dev, "Evicting buffers...\n");
+	ttm_bo_evict_mm(&dev_priv->ttm.bdev, TTM_PL_VRAM);
+
+	NV_INFO(dev, "Idling channels...\n");
+	for (i = 0; i < engine->fifo.channels; i++) {
+		struct nouveau_channel *chan = dev_priv->fifos[i];
+		struct nouveau_fence *fence = NULL;
+
+		if (!chan || (dev_priv->card_type >= NV_50 &&
+			      chan == dev_priv->fifos[0]))
+			continue;
+
+		ret = nouveau_fence_new(chan, &fence, true);
+		if (ret == 0) {
+			ret = nouveau_fence_wait(fence, NULL, false, false);
+			nouveau_fence_unref((void *)&fence);
+		}
+
+		if (ret) {
+			NV_ERROR(dev, "Failed to idle channel %d for suspend\n",
+				 chan->id);
+		}
+	}
+
+	engine->graph.fifo_access(dev, false);
+	nouveau_wait_for_idle(dev);
+
+	nv_wr32(NV03_PFIFO_CACHES, 0x00000000);
+	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH, nv_rd32(
+		NV04_PFIFO_CACHE1_DMA_PUSH) & ~1);
+	nv_wr32(NV03_PFIFO_CACHE1_PUSH0, 0x00000000);
+	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x00000000);
+
+	i = engine->fifo.channel_id(dev);
+	NV_INFO(dev, "Last active channel was %d\n", i);
+	if (i >= 0 && i < engine->fifo.channels && dev_priv->fifos[i]) {
+		struct nouveau_channel *chan = dev_priv->fifos[i];
+
+		NV_INFO(dev, "Saving state of channel %d...\n", chan->id);
+		engine->fifo.save_context(chan);
+		engine->graph.save_context(chan);
+	}
+
+	NV_INFO(dev, "Suspending GPU objects...\n");
+	ret = nouveau_gpuobj_suspend(dev);
+	if (ret) {
+		NV_ERROR(dev, "... failed: %d\n", ret);
+		return ret;
+	}
+
+	if (engine->instmem.suspend) {
+		ret = engine->instmem.suspend(dev);
+		if (ret) {
+			NV_ERROR(dev, "... failed: %d\n", ret);
+			return ret;
+		}
+	}
+
+	NV_INFO(dev, "And we're gone!\n");
+	pci_save_state(pdev);
+	if (pm_state.event == PM_EVENT_SUSPEND) {
+		pci_disable_device(pdev);
+		pci_set_power_state(pdev, PCI_D3hot);
+	}
+
+	acquire_console_sem();
+	fb_set_suspend(dev_priv->fbdev_info, 1);
+	release_console_sem();
+	dev_priv->fbdev_info->flags = fbdev_flags;
+	return 0;
 }
 
 static int
 nouveau_pci_resume(struct pci_dev *pdev)
 {
 	struct drm_device *dev = pci_get_drvdata(pdev);
-	(void)dev;
-	return -ENODEV;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nouveau_engine *engine = &dev_priv->engine;
+	struct drm_crtc *crtc;
+	uint32_t fbdev_flags;
+	int ret;
+
+	if (!drm_core_check_feature(dev, DRIVER_MODESET))
+		return -ENODEV;
+
+	fbdev_flags = dev_priv->fbdev_info->flags;
+	dev_priv->fbdev_info->flags |= FBINFO_HWACCEL_DISABLED;
+
+	NV_INFO(dev, "We're back, enabling device...\n");
+	pci_set_power_state(pdev, PCI_D0);
+	pci_restore_state(pdev);
+	if (pci_enable_device(pdev))
+		return -1;
+	pci_set_master(dev->pdev);
+
+	NV_INFO(dev, "POSTing device...\n");
+	ret = nouveau_run_vbios_init(dev);
+	if (ret)
+		return ret;
+
+	if (dev_priv->gart_info.type == NOUVEAU_GART_AGP) {
+		ret = nouveau_mem_init_agp(dev);
+		if (ret) {
+			NV_ERROR(dev, "error reinitialising AGP: %d\n", ret);
+			return ret;
+		}
+	}
+
+	NV_INFO(dev, "Reinitialising engines...\n");
+	if (engine->instmem.resume)
+		engine->instmem.resume(dev);
+	engine->mc.init(dev);
+	engine->timer.init(dev);
+	engine->fb.init(dev);
+	engine->graph.init(dev);
+	engine->fifo.init(dev);
+
+	NV_INFO(dev, "Restoring GPU objects...\n");
+	nouveau_gpuobj_resume(dev);
+
+	nouveau_irq_postinstall(dev);
+
+	if (dev_priv->card_type < NV_50) {
+		engine->fifo.load_context(dev_priv->channel);
+		engine->graph.load_context(dev_priv->channel);
+	}
+
+	NV_INFO(dev, "Re-enabling acceleration..\n");
+	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH,
+		 nv_rd32(NV04_PFIFO_CACHE1_DMA_PUSH) | 1);
+	nv_wr32(NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
+	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x00000001);
+	nv_wr32(NV04_PFIFO_CACHE1_PULL1, 0x00000001);
+	nv_wr32(NV03_PFIFO_CACHES, 1);
+
+	engine->graph.fifo_access(dev, true);
+
+	NV_INFO(dev, "Restoring mode...\n");
+	if (dev_priv->card_type < NV_50)
+		nv04_display_restore(dev);
+	else
+		nv50_display_init(dev);
+
+	/* Force CLUT to get re-loaded during modeset */
+	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+		struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
+
+		nv_crtc->lut.depth = 0;
+	}
+
+	acquire_console_sem();
+	fb_set_suspend(dev_priv->fbdev_info, 0);
+	release_console_sem();
+
+	drm_helper_resume_force_mode(dev);
+	dev_priv->fbdev_info->flags = fbdev_flags;
+	return 0;
 }
 
 extern struct drm_ioctl_desc nouveau_ioctls[];

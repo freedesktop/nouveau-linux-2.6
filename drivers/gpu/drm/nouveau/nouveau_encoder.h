@@ -41,11 +41,9 @@ struct nouveau_encoder {
 
 	int last_dpms;
 
-	int (*set_clock_mode) (struct nouveau_encoder *encoder,
-			       struct drm_display_mode *mode);
 	struct nv04_output_reg restore;
 };
-#define to_nouveau_encoder(x) container_of((x), struct nouveau_encoder, base)
+#define nouveau_encoder(x) container_of((x), struct nouveau_encoder, base)
 
 int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry);
 int nv50_dac_create(struct drm_device *dev, struct dcb_entry *entry);

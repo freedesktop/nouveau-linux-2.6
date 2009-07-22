@@ -688,7 +688,7 @@ int nv10_graph_save_context(struct nouveau_channel *chan)
 	return 0;
 }
 
-void nouveau_nv10_context_switch(struct drm_device *dev)
+void nv10_graph_context_switch(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv;
 	struct nouveau_engine *engine;
@@ -856,7 +856,7 @@ void nv10_graph_destroy_context(struct nouveau_channel *chan)
 	nv_wr32(NV04_PGRAPH_FIFO, 0x1);
 #else
 	if (chid == chan->id) {
-		NV_INFO(dev, "cleanning a channel with graph in current context\n");
+		NV_INFO(dev, "cleaning a channel with graph in current context\n");
 	}
 #endif
 }

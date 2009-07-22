@@ -323,12 +323,9 @@ static int valid_reg(struct drm_device *dev, uint32_t reg)
 			return 1;
 	}
 	if (nv_arch(dev) >= NV_50) {
-		/* No clue what they do, but because they are outside normal
-		 * ranges we'd better list them seperately. */
-		if (reg == 0x00020018 || reg == 0x0002004C ||
-		    reg == 0x00020060 || reg == 0x00021028 ||
-		    reg == 0x00021218 || reg == 0x0002130C ||
-		    reg == 0x00089008 || reg == 0x00089028)
+		if (reg >= 0x00020000 && reg < 0x00030000)
+			return 1;
+		if (reg >= 0x00080000 && reg < 0x00080000)
 			return 1;
 	}
 	if (WITHIN(reg,NV_PFB_OFFSET,NV_PFB_SIZE))
@@ -355,14 +352,21 @@ static int valid_reg(struct drm_device *dev, uint32_t reg)
 
 static bool valid_idx_port(struct drm_device *dev, uint16_t port)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
 	/* if adding more ports here, the read/write functions below will need
 	 * updating so that the correct mmio range (PRMCIO, PRMDIO, PRMVIO) is
 	 * used for the port in question
 	 */
-	if (port == NV_CIO_CRX__COLOR)
-		return true;
-	if (port == NV_VIO_SRX)
-		return true;
+	if (dev_priv->card_type < NV_50) {
+		if (port == NV_CIO_CRX__COLOR)
+			return true;
+		if (port == NV_VIO_SRX)
+			return true;
+	} else {
+		if (port == NV_CIO_CRX__COLOR)
+			return true;
+	}
 
 	NV_ERROR(dev, "========== unknown indexed io port 0x%04X ==========\n",
 		 port);
@@ -434,25 +438,36 @@ static void bios_wr32(struct drm_device *dev, uint32_t reg, uint32_t data)
 	}
 }
 
-static uint8_t bios_idxprt_rd(struct drm_device *dev, uint16_t port, uint8_t index)
+static uint8_t
+bios_idxprt_rd(struct drm_device *dev, uint16_t port, uint8_t index)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint8_t data;
 
 	if (!valid_idx_port(dev, port))
 		return 0;
 
-	if (port == NV_VIO_SRX)
-		data = NVReadVgaSeq(dev, crtchead, index);
-	else	/* assume NV_CIO_CRX__COLOR */
-		data = NVReadVgaCrtc(dev, crtchead, index);
+	if (dev_priv->card_type < NV_50) {
+		if (port == NV_VIO_SRX)
+			data = NVReadVgaSeq(dev, crtchead, index);
+		else	/* assume NV_CIO_CRX__COLOR */
+			data = NVReadVgaCrtc(dev, crtchead, index);
+	} else {
+		uint32_t data32;
 
-	BIOSLOG(dev, "	Indexed IO read:  Port: 0x%04X, Index: 0x%02X, Head: 0x%02X, Data: 0x%02X\n",
+		data32 = bios_rd32(dev, NV50_PDISPLAY_VGACRTC(index & ~3));
+		data = (data32 >> ((index & 3) << 3)) & 0xff;
+	}
+
+	BIOSLOG(dev, "	Indexed IO read:  Port: 0x%04X, Index: 0x%02X, "
+		     "Head: 0x%02X, Data: 0x%02X\n",
 		port, index, crtchead, data);
-
 	return data;
 }
 
-static void bios_idxprt_wr(struct drm_device *dev, uint16_t port, uint8_t index, uint8_t data)
+static void
+bios_idxprt_wr(struct drm_device *dev, uint16_t port,
+	       uint8_t index, uint8_t data)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
@@ -465,22 +480,35 @@ static void bios_idxprt_wr(struct drm_device *dev, uint16_t port, uint8_t index,
 	 * As CR44 only exists on CRTC0, we update crtchead to head0 in advance
 	 * of the write, and to head1 after the write
 	 */
-	if (port == NV_CIO_CRX__COLOR && index == NV_CIO_CRE_44 && data != NV_CIO_CRE_44_HEADB)
+	if (port == NV_CIO_CRX__COLOR && index == NV_CIO_CRE_44 &&
+	    data != NV_CIO_CRE_44_HEADB)
 		crtchead = 0;
 
 	LOG_OLD_VALUE(bios_idxprt_rd(dev, port, index));
-	BIOSLOG(dev, "	Indexed IO write: Port: 0x%04X, Index: 0x%02X, Head: 0x%02X, Data: 0x%02X\n",
+	BIOSLOG(dev, "	Indexed IO write: Port: 0x%04X, Index: 0x%02X, "
+		     "Head: 0x%02X, Data: 0x%02X\n",
 		port, index, crtchead, data);
 
-	if (dev_priv->VBIOS.execute) {
+	if (dev_priv->VBIOS.execute && dev_priv->card_type < NV_50) {
 		still_alive();
 		if (port == NV_VIO_SRX)
 			NVWriteVgaSeq(dev, crtchead, index, data);
 		else	/* assume NV_CIO_CRX__COLOR */
 			NVWriteVgaCrtc(dev, crtchead, index, data);
+	} else
+	if (dev_priv->VBIOS.execute) {
+		uint32_t data32, shift = (index & 3) << 3;
+
+		still_alive();
+
+		data32  = bios_rd32(dev, NV50_PDISPLAY_VGACRTC(index & ~3));
+		data32 &= ~(0xff << shift);
+		data32 |= (data << shift);
+		bios_wr32(dev, NV50_PDISPLAY_VGACRTC(index & ~3), data32);
 	}
 
-	if (port == NV_CIO_CRX__COLOR && index == NV_CIO_CRE_44 && data == NV_CIO_CRE_44_HEADB)
+	if (port == NV_CIO_CRX__COLOR &&
+	    index == NV_CIO_CRE_44 && data == NV_CIO_CRE_44_HEADB)
 		crtchead = 1;
 }
 
@@ -596,12 +624,47 @@ static bool io_condition_met(struct drm_device *dev, struct nvbios *bios, uint16
 	return (data == cmpval);
 }
 
-static int setPLL(struct drm_device *dev, struct nvbios *bios, uint32_t reg, uint32_t clk)
+static int
+nv50_pll_set(struct drm_device *dev, uint32_t reg, uint32_t clk)
 {
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	uint32_t reg0 = nv_rd32(reg + 0);
+	uint32_t reg1 = nv_rd32(reg + 4);
+	struct nouveau_pll_vals pll;
+	struct pll_lims pll_limits;
+	int ret;
+
+	ret = get_pll_limits(dev, reg, &pll_limits);
+	if (ret)
+		return ret;
+
+	clk = nouveau_calc_pll_mnp(dev, &pll_limits, clk, &pll);
+	if (!clk)
+		return -ERANGE;
+
+	reg0 = (reg0 & 0xfff8ffff) | (pll.log2P << 16);
+	reg1 = (reg1 & 0xffff0000) | (pll.N1 << 8) | pll.M1;
+
+	if (dev_priv->VBIOS.execute) {
+		still_alive();
+		nv_wr32(reg + 4, reg1);
+		nv_wr32(reg + 0, reg0);
+	}
+
+	return 0;
+}
+
+static int
+setPLL(struct drm_device *dev, struct nvbios *bios, uint32_t reg, uint32_t clk)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	/* clk in kHz */
 	struct pll_lims pll_lim;
-	int ret;
 	struct nouveau_pll_vals pllvals;
+	int ret;
+
+	if (dev_priv->card_type >= NV_50)
+		return nv50_pll_set(dev, reg, clk);
 
 	/* high regs (such as in the mac g5 table) are not -= 4 */
 	if ((ret = get_pll_limits(dev, reg > 0x405c ? reg : reg - 4, &pll_lim)))
@@ -1669,6 +1732,16 @@ static bool init_compute_mem(struct drm_device *dev, struct nvbios *bios, uint16
 
 	/* no iexec->execute check by design */
 
+	/* this appears to be a NOP on G8x chipsets, both io logs of the VBIOS
+	 * and kmmio traces of the binary driver POSTing the card show nothing
+	 * being done for this opcode.  why is it still listed in the table?!
+	 */
+
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+
+	if (dev_priv->card_type >= NV_50)
+		return true;
+
 	/* on every card I've seen, this step gets done for us earlier in the init scripts
 	uint8_t crdata = bios_idxprt_rd(dev, NV_VIO_SRX, 0x01);
 	bios_idxprt_wr(dev, NV_VIO_SRX, 0x01, crdata | 0x20);
@@ -1839,6 +1912,7 @@ static bool init_io(struct drm_device *dev, struct nvbios *bios, uint16_t offset
 	 * Assign ((IOVAL("crtc port") & "mask") | "data") to "crtc port"
 	 */
 
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint16_t crtcport = ROM16(bios->data[offset + 1]);
 	uint8_t mask = bios->data[offset + 3];
 	uint8_t data = bios->data[offset + 4];
@@ -1848,6 +1922,44 @@ static bool init_io(struct drm_device *dev, struct nvbios *bios, uint16_t offset
 
 	BIOSLOG(dev, "0x%04X: Port: 0x%04X, Mask: 0x%02X, Data: 0x%02X\n",
 		offset, crtcport, mask, data);
+
+	/* I have no idea what this does, but NVIDIA do this magic sequence
+	 * in the places where this INIT_IO happens..
+	 */
+	if (dev_priv->card_type >= NV_50 && crtcport == 0x3c3 && data == 1) {
+		int i;
+
+		bios_wr32(dev, 0x614100,
+			  (bios_rd32(dev, 0x614100) & 0x0fffffff) | 0x00800000);
+		bios_wr32(dev, 0x00e18c, bios_rd32(dev, 0x00e18c) | 0x00020000);
+		bios_wr32(dev, 0x614900,
+			  (bios_rd32(dev, 0x614900) & 0x0fffffff) | 0x00800000);
+		bios_wr32(dev, 0x000200, bios_rd32(dev, 0x000200) &~0x40000000);
+		mdelay(10);
+		bios_wr32(dev, 0x00e18c, bios_rd32(dev, 0x00e18c) &~0x00020000);
+		bios_wr32(dev, 0x000200, bios_rd32(dev, 0x000200) | 0x40000000);
+		bios_wr32(dev, 0x614100, 0x00800018);
+		bios_wr32(dev, 0x614900, 0x00800018);
+		mdelay(10);
+		bios_wr32(dev, 0x614100, 0x10000018);
+		bios_wr32(dev, 0x614900, 0x10000018);
+		for (i = 0; i < 3; i++)
+		bios_wr32(dev, 0x614280 + (i*0x800), bios_rd32(
+			  dev, 0x614280 + (i*0x800)) & 0xf0f0f0f0);
+		for (i = 0; i < 2; i++)
+		bios_wr32(dev, 0x614300 + (i*0x800), bios_rd32(
+			  dev, 0x614300 + (i*0x800)) & 0xfffff0f0);
+		for (i = 0; i < 3; i++)
+		bios_wr32(dev, 0x614380 + (i*0x800), bios_rd32(
+			  dev, 0x614380 + (i*0x800)) & 0xfffff0f0);
+		for (i = 0; i < 2; i++)
+		bios_wr32(dev, 0x614200 + (i*0x800), bios_rd32(
+			  dev, 0x614200 + (i*0x800)) & 0xfffffff0);
+		for (i = 0; i < 2; i++)
+		bios_wr32(dev, 0x614108 + (i*0x800), bios_rd32(
+			  dev, 0x614108 + (i*0x800)) & 0x0fffffff);
+		return true;
+	}
 
 	bios_port_wr(dev, crtcport, (bios_port_rd(dev, crtcport) & mask) | data);
 
@@ -2162,6 +2274,9 @@ static bool init_zm_reg(struct drm_device *dev, struct nvbios *bios, uint16_t of
 	if (!iexec->execute)
 		return true;
 
+	if (reg == 0x000200)
+		value |= 1;
+
 	bios_wr32(dev, reg, value);
 
 	return true;
@@ -2405,6 +2520,36 @@ init_96(struct drm_device *dev, struct nvbios *bios, uint16_t offset,
 	return true;
 }
 
+static bool
+init_97(struct drm_device *dev, struct nvbios *bios, uint16_t offset,
+	struct init_exec *iexec)
+{
+	/* INIT_97   opcode: 0x97 ('')
+	 *
+	 * offset      (8  bit): opcode
+	 * offset + 1  (32 bit): register
+	 * offset + 5  (32 bit): mask
+	 * offset + 9  (32 bit): value
+	 *
+	 * Adds "value" to "register" preserving the fields specified
+	 * by "mask"
+	 */
+
+	uint32_t reg = ROM32(bios->data[offset + 1]);
+	uint32_t mask = ROM32(bios->data[offset + 5]);
+	uint32_t add = ROM32(bios->data[offset + 9]);
+	uint32_t val;
+
+	val = bios_rd32(dev, reg);
+	val = (val & mask) | ((val + add) & ~mask);
+
+	if (!iexec->execute)
+		return true;
+
+	bios_wr32(dev, reg, val);
+	return true;
+}
+
 static struct init_tbl_entry itbl_entry[] = {
 	/* command name                       , id  , length  , offset  , mult    , command handler                 */
 	/* INIT_PROG (0x31, 15, 10, 4) removed due to no example of use */
@@ -2459,6 +2604,7 @@ static struct init_tbl_entry itbl_entry[] = {
 	{ "INIT_ZM_REG_GROUP_ADDRESS_LATCHED" , 0x91, 6       , 5       , 4       , init_zm_reg_group_addr_latched  },
 	{ "INIT_RESERVED"                     , 0x92, 1       , 0       , 0       , init_reserved                   },
 	{ "INIT_96"                           , 0x96, 17      , 0       , 0       , init_96                         },
+	{ "INIT_97"                           , 0x97, 13      , 0       , 0       , init_97                         },
 	{ 0                                   , 0   , 0       , 0       , 0       , 0                               }
 };
 
@@ -3217,7 +3363,7 @@ nouveau_bios_run_display_table(struct drm_device *dev, struct dcb_entry *dcbent,
 			sub = 0x0001; /* 0x0001 0x0002 0x0105 */
 		break;
 	default:
-		sub = 0x0000; /* 0x0000 */
+		sub = 0x00ff; /* 0x00ff */
 		break;
 	}
 
@@ -3789,6 +3935,8 @@ static int parse_bit_init_tbl_entry(struct drm_device *dev, struct nvbios *bios,
 
 	parse_script_table_pointers(bios, bitentry->offset);
 
+	if (bitentry->length >= 16)
+		bios->some_script_ptr = ROM16(bios->data[bitentry->offset + 14]);
 	if (bitentry->length >= 18)
 		bios->init96_tbl_ptr = ROM16(bios->data[bitentry->offset + 16]);
 
@@ -4842,7 +4990,7 @@ int nouveau_run_vbios_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nvbios *bios = &dev_priv->VBIOS;
-	int ret = 0;
+	int i, ret = 0;
 
 	NVLockVgaCrtcs(dev, false);
 	if (nv_two_heads(dev))
@@ -4853,13 +5001,20 @@ int nouveau_run_vbios_init(struct drm_device *dev)
 
 	parse_init_tables(dev, bios);
 
-	if (bios->major_version < 5)
-		/* feature_byte on BMP is poor, but init always sets CR4B */
-		bios->is_mobile = NVReadVgaCrtc(dev, 0, NV_CIO_CRE_4B) & 0x40;
+	/* Runs some additional script seen on G8x VBIOSen.  The VBIOS'
+	 * parser will run this right after the init tables, the binary
+	 * driver appears to run it at some point later.
+	 */
+	if (bios->some_script_ptr) {
+		struct init_exec iexec = {true, false};
 
-	/* all BIT systems need p_f_m_t for digital_min_front_porch */
-	if (bios->is_mobile || bios->major_version >= 5)
-		ret = parse_fp_mode_table(dev, bios);
+		NV_INFO(dev, "Parsing VBIOS init table at offset 0x%04X\n",
+			bios->some_script_ptr);
+		parse_init_table(dev, bios, bios->some_script_ptr, &iexec);
+	}
+
+	for (i = 0; i < bios->bdcb.dcb.entries; i++)
+		nouveau_bios_run_display_table(dev, &bios->bdcb.dcb.entry[i], 0);
 
 	NVLockVgaCrtcs(dev, true);
 
@@ -4891,6 +5046,16 @@ int nouveau_parse_bios(struct drm_device *dev)
 	/* init script execution disabled */
 	bios->execute = false;
 
+	/* ... unless card isn't POSTed already */
+	if (dev_priv->card_type == NV_50) {
+		if (NVReadVgaCrtc(dev, 0, 0x00) == 0 &&
+		    NVReadVgaCrtc(dev, 0, 0x1a) == 0) {
+			NV_INFO(dev, "Adaptor not initialised, "
+				     "running VBIOS init tables\n");
+			bios->execute = true;
+		}
+	}
+
 	bios_wr32(dev, NV_PEXTDEV_BOOT_0, saved_nv_pextdev_boot_0);
 
 	dev_priv->vbios = &bios->pub;
@@ -4899,6 +5064,14 @@ int nouveau_parse_bios(struct drm_device *dev)
 		dev_priv->vbios = NULL;
 		return ret;
 	}
+
+	if (bios->major_version < 5)
+		/* feature_byte on BMP is poor, but init always sets CR4B */
+		bios->is_mobile = NVReadVgaCrtc(dev, 0, NV_CIO_CRE_4B) & 0x40;
+
+	/* all BIT systems need p_f_m_t for digital_min_front_porch */
+	if (bios->is_mobile || bios->major_version >= 5)
+		ret = parse_fp_mode_table(dev, bios);
 
 	/* allow subsequent scripts to execute */
 	bios->execute = true;

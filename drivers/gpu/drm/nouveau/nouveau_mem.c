@@ -292,6 +292,27 @@ void nouveau_mem_close(struct drm_device *dev)
 
 	nouveau_ttm_global_release(dev_priv);
 
+	if (drm_core_has_AGP(dev) && dev->agp &&
+	    drm_core_check_feature(dev, DRIVER_MODESET)) {
+		struct drm_agp_mem *entry, *tempe;
+
+		/* Remove AGP resources, but leave dev->agp
+		   intact until drv_cleanup is called. */
+		list_for_each_entry_safe(entry, tempe, &dev->agp->memory, head) {
+			if (entry->bound)
+				drm_unbind_agp(entry->memory);
+			drm_free_agp(entry->memory, entry->pages);
+			kfree(entry);
+		}
+		INIT_LIST_HEAD(&dev->agp->memory);
+
+		if (dev->agp->acquired)
+			drm_agp_release(dev);
+
+		dev->agp->acquired = 0;
+		dev->agp->enabled = 0;
+	}
+
 	if (dev_priv->fb_mtrr) {
 		drm_mtrr_del(dev_priv->fb_mtrr, drm_get_resource_start(dev, 1),
 			     drm_get_resource_len(dev, 1), DRM_MTRR_WC);
@@ -400,7 +421,7 @@ static void nouveau_mem_reset_agp(struct drm_device *dev)
 	nv_wr32(NV04_PBUS_PCI_NV_1, saved_pci_nv_1);
 }
 
-static int
+int
 nouveau_mem_init_agp(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
@@ -413,10 +434,12 @@ nouveau_mem_init_agp(struct drm_device *dev)
 
 	nouveau_mem_reset_agp(dev);
 
-	ret = drm_agp_acquire(dev);
-	if (ret) {
-		NV_ERROR(dev, "Unable to acquire AGP: %d\n", ret);
-		return ret;
+	if (!dev->agp->acquired) {
+		ret = drm_agp_acquire(dev);
+		if (ret) {
+			NV_ERROR(dev, "Unable to acquire AGP: %d\n", ret);
+			return ret;
+		}
 	}
 
 	ret = drm_agp_info(dev, &info);
@@ -461,6 +484,9 @@ nouveau_mem_init(struct drm_device *dev)
 		NV_ERROR(dev, "Error initialising bo driver: %d\n", ret);
 		return ret;
 	}
+
+	INIT_LIST_HEAD(&dev_priv->ttm.bo_list);
+	spin_lock_init(&dev_priv->ttm.bo_list_lock);
 
 	/* non-mappable vram */
 	dev_priv->fb_available_size = nouveau_mem_fb_amount(dev);

@@ -38,7 +38,7 @@ nv50_dac_disconnect(struct nouveau_encoder *encoder)
 {
 	struct drm_device *dev = encoder->base.dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_channel *evo = &dev_priv->evo.chan;
+	struct nouveau_channel *evo = dev_priv->evo;
 	int ret;
 
 	NV_DEBUG(dev, "or %d\n", encoder->or);
@@ -52,39 +52,27 @@ nv50_dac_disconnect(struct nouveau_encoder *encoder)
 	OUT_RING  (evo, 0);
 }
 
-static int
-nv50_dac_set_clock_mode(struct nouveau_encoder *encoder,
-			struct drm_display_mode *mode)
-{
-	struct drm_device *dev = encoder->base.dev;
-
-	NV_DEBUG(dev, "or %d\n", encoder->or);
-
-	nv_wr32(NV50_PDISPLAY_DAC_CLK_CTRL2(encoder->or),  0);
-	return 0;
-}
-
 static enum drm_connector_status
 nv50_dac_detect(struct drm_encoder *drm_encoder,
 		struct drm_connector *drm_connector)
 {
-	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
+	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 	struct drm_device *dev = encoder->base.dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	enum drm_connector_status status = connector_status_disconnected;
 	uint32_t dpms_state, load_pattern, load_state;
 	int or = encoder->or;
 
-	nv_wr32(NV50_PDISPLAY_DAC_REGS_CLK_CTRL1(or), 0x00000001);
-	dpms_state = nv_rd32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or));
+	nv_wr32(NV50_PDISPLAY_DAC_CLK_CTRL1(or), 0x00000001);
+	dpms_state = nv_rd32(NV50_PDISPLAY_DAC_DPMS_CTRL(or));
 
-	nv_wr32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or),
-		0x00150000 | NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
-	if (!nv_wait(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or),
-		     NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING, 0)) {
+	nv_wr32(NV50_PDISPLAY_DAC_DPMS_CTRL(or),
+		0x00150000 | NV50_PDISPLAY_DAC_DPMS_CTRL_PENDING);
+	if (!nv_wait(NV50_PDISPLAY_DAC_DPMS_CTRL(or),
+		     NV50_PDISPLAY_DAC_DPMS_CTRL_PENDING, 0)) {
 		NV_ERROR(dev, "timeout: DAC_DPMS_CTRL_PENDING(%d) == 0\n", or);
 		NV_ERROR(dev, "DAC_DPMS_CTRL(%d) = 0x%08x\n", or,
-			  nv_rd32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or)));
+			  nv_rd32(NV50_PDISPLAY_DAC_DPMS_CTRL(or)));
 		return status;
 	}
 
@@ -99,17 +87,17 @@ nv50_dac_detect(struct drm_encoder *drm_encoder,
 			 load_pattern);
 	}
 
-	nv_wr32(NV50_PDISPLAY_DAC_REGS_LOAD_CTRL(or),
-		NV50_PDISPLAY_DAC_REGS_LOAD_CTRL_ACTIVE | load_pattern);
+	nv_wr32(NV50_PDISPLAY_DAC_LOAD_CTRL(or),
+		NV50_PDISPLAY_DAC_LOAD_CTRL_ACTIVE | load_pattern);
 	mdelay(45); /* give it some time to process */
-	load_state = nv_rd32(NV50_PDISPLAY_DAC_REGS_LOAD_CTRL(or));
+	load_state = nv_rd32(NV50_PDISPLAY_DAC_LOAD_CTRL(or));
 
-	nv_wr32(NV50_PDISPLAY_DAC_REGS_LOAD_CTRL(or), 0);
-	nv_wr32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or), dpms_state |
-		NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
+	nv_wr32(NV50_PDISPLAY_DAC_LOAD_CTRL(or), 0);
+	nv_wr32(NV50_PDISPLAY_DAC_DPMS_CTRL(or), dpms_state |
+		NV50_PDISPLAY_DAC_DPMS_CTRL_PENDING);
 
-	if ((load_state & NV50_PDISPLAY_DAC_REGS_LOAD_CTRL_PRESENT) ==
-			  NV50_PDISPLAY_DAC_REGS_LOAD_CTRL_PRESENT)
+	if ((load_state & NV50_PDISPLAY_DAC_LOAD_CTRL_PRESENT) ==
+			  NV50_PDISPLAY_DAC_LOAD_CTRL_PRESENT)
 		status = connector_status_connected;
 
 	if (status == connector_status_connected)
@@ -124,7 +112,7 @@ static void nv50_dac_dpms(struct drm_encoder *drm_encoder, int mode)
 {
 	struct drm_device *dev = drm_encoder->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
+	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 	uint32_t val;
 	int or = encoder->or;
 
@@ -136,37 +124,37 @@ static void nv50_dac_dpms(struct drm_encoder *drm_encoder, int mode)
 	}
 
 	/* wait for it to be done */
-	if (!nv_wait(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or),
-		     NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING, 0)) {
+	if (!nv_wait(NV50_PDISPLAY_DAC_DPMS_CTRL(or),
+		     NV50_PDISPLAY_DAC_DPMS_CTRL_PENDING, 0)) {
 		NV_ERROR(dev, "timeout: DAC_DPMS_CTRL_PENDING(%d) == 0\n", or);
 		NV_ERROR(dev, "DAC_DPMS_CTRL(%d) = 0x%08x\n", or,
-			  nv_rd32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or)));
+			  nv_rd32(NV50_PDISPLAY_DAC_DPMS_CTRL(or)));
 		return;
 	}
 
-	val = nv_rd32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or)) & ~0x7F;
+	val = nv_rd32(NV50_PDISPLAY_DAC_DPMS_CTRL(or)) & ~0x7F;
 
 	if (mode != DRM_MODE_DPMS_ON)
-		val |= NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_BLANKED;
+		val |= NV50_PDISPLAY_DAC_DPMS_CTRL_BLANKED;
 
 	switch (mode) {
 	case DRM_MODE_DPMS_STANDBY:
-		val |= NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_HSYNC_OFF;
+		val |= NV50_PDISPLAY_DAC_DPMS_CTRL_HSYNC_OFF;
 		break;
 	case DRM_MODE_DPMS_SUSPEND:
-		val |= NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_VSYNC_OFF;
+		val |= NV50_PDISPLAY_DAC_DPMS_CTRL_VSYNC_OFF;
 		break;
 	case DRM_MODE_DPMS_OFF:
-		val |= NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_OFF;
-		val |= NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_HSYNC_OFF;
-		val |= NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_VSYNC_OFF;
+		val |= NV50_PDISPLAY_DAC_DPMS_CTRL_OFF;
+		val |= NV50_PDISPLAY_DAC_DPMS_CTRL_HSYNC_OFF;
+		val |= NV50_PDISPLAY_DAC_DPMS_CTRL_VSYNC_OFF;
 		break;
 	default:
 		break;
 	}
 
-	nv_wr32(NV50_PDISPLAY_DAC_REGS_DPMS_CTRL(or),
-		val | NV50_PDISPLAY_DAC_REGS_DPMS_CTRL_PENDING);
+	nv_wr32(NV50_PDISPLAY_DAC_DPMS_CTRL(or), val |
+		NV50_PDISPLAY_DAC_DPMS_CTRL_PENDING);
 }
 
 static void nv50_dac_save(struct drm_encoder *drm_encoder)
@@ -198,11 +186,11 @@ static void nv50_dac_mode_set(struct drm_encoder *drm_encoder,
 			      struct drm_display_mode *mode,
 			      struct drm_display_mode *adjusted_mode)
 {
-	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
+	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 	struct drm_device *dev = drm_encoder->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_channel *evo = &dev_priv->evo.chan;
-	struct nouveau_crtc *crtc = to_nouveau_crtc(drm_encoder->crtc);
+	struct nouveau_channel *evo = dev_priv->evo;
+	struct nouveau_crtc *crtc = nouveau_crtc(drm_encoder->crtc);
 	uint32_t mode_ctl = 0, mode_ctl2 = 0;
 	int ret;
 
@@ -255,7 +243,7 @@ static const struct drm_encoder_helper_funcs nv50_dac_helper_funcs = {
 
 static void nv50_dac_destroy(struct drm_encoder *drm_encoder)
 {
-	struct nouveau_encoder *encoder = to_nouveau_encoder(drm_encoder);
+	struct nouveau_encoder *encoder = nouveau_encoder(drm_encoder);
 
 	NV_DEBUG(drm_encoder->dev, "\n");
 
@@ -284,9 +272,6 @@ int nv50_dac_create(struct drm_device *dev, struct dcb_entry *entry)
 
 	encoder->dcb = entry;
 	encoder->or = ffs(entry->or) - 1;
-
-	/* Set function pointers. */
-	encoder->set_clock_mode = nv50_dac_set_clock_mode;
 
 	drm_encoder_init(dev, &encoder->base, &nv50_dac_encoder_funcs,
 			 DRM_MODE_ENCODER_DAC);

@@ -96,7 +96,13 @@ static int nouveau_fifo_instmem_configure(struct drm_device *dev)
 int nouveau_fifo_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	int ret;
+	uint32_t mode = 0;
+	int ret, i;
+
+	for (i = 0; i < dev_priv->engine.fifo.channels; i++) {
+		if (dev_priv->fifos[i])
+			mode |= (1 << i);
+	}
 
 	nv_wr32(NV03_PMC_ENABLE, nv_rd32(NV03_PMC_ENABLE) &
 			~NV_PMC_ENABLE_PFIFO);
@@ -148,11 +154,6 @@ int nouveau_fifo_init(struct drm_device *dev)
 #endif
 				      0x00000000);
 
-	nv_wr32(NV04_PFIFO_CACHE1_DMA_PUSH, 0x00000001);
-	nv_wr32(NV03_PFIFO_CACHE1_PUSH0, 0x00000001);
-	nv_wr32(NV04_PFIFO_CACHE1_PULL0, 0x00000001);
-	nv_wr32(NV04_PFIFO_CACHE1_PULL1, 0x00000001);
-
 	/* FIXME on NV04 */
 	if (dev_priv->card_type >= NV_10) {
 		nv_wr32(NV10_PGRAPH_CTX_USER, 0x0);
@@ -168,7 +169,7 @@ int nouveau_fifo_init(struct drm_device *dev)
 	}
 
 	nv_wr32(NV04_PFIFO_DMA_TIMESLICE, 0x001fffff);
-	nv_wr32(NV03_PFIFO_CACHES, 0x00000001);
+	nv_wr32(NV04_PFIFO_MODE, mode);
 	return 0;
 }
 
@@ -239,6 +240,13 @@ nouveau_fifo_user_pushbuf_alloc(struct drm_device *dev)
 			     false, true, &pushbuf);
 	if (ret) {
 		NV_ERROR(dev, "error allocating DMA push buffer: %d\n", ret);
+		return NULL;
+	}
+
+	ret = nouveau_bo_pin(pushbuf, config->cmdbuf.location);
+	if (ret) {
+		NV_ERROR(dev, "error pinning DMA push buffer: %d\n", ret);
+		nouveau_bo_ref(NULL, &pushbuf);
 		return NULL;
 	}
 

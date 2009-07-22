@@ -83,7 +83,7 @@ nouveau_call_method(struct nouveau_channel *chan, int class, int mthd, int data)
 		grc++;
 	}
 
-	if (grc->id != class)
+	if (grc->id != class || !grc->methods)
 		return -ENOENT;
 
 	grm = grc->methods;
@@ -114,12 +114,12 @@ nouveau_fifo_swmthd(struct nouveau_channel *chan, uint32_t addr, uint32_t data)
 
 		chan->sw_subchannel[subc] = ref->gpuobj->class;
 		nv_wr32(NV04_PFIFO_CACHE1_ENGINE, nv_rd32(
-			NV04_PFIFO_CACHE1_ENGINE & ~(0xf << subc*4)));
+			NV04_PFIFO_CACHE1_ENGINE) & ~(0xf << subc*4));
 		return true;
 	}
 
 	/* hw object */
-	if (nv_rd32(NV04_PFIFO_CACHE1_ENGINE) & (1 << subc))
+	if (nv_rd32(NV04_PFIFO_CACHE1_ENGINE) & (1 << (subc*4)))
 		return false;
 
 	if (nouveau_call_method(chan, chan->sw_subchannel[subc], mthd, data))
@@ -278,35 +278,38 @@ static int
 nouveau_graph_chid_from_grctx(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	uint32_t inst, tmp;
+	uint32_t inst;
 	int i;
 
 	if (dev_priv->card_type < NV_40)
 		return dev_priv->engine.fifo.channels;
 	else
-	if (dev_priv->card_type < NV_50)
+	if (dev_priv->card_type < NV_50) {
 		inst = (nv_rd32(0x40032c) & 0xfffff) << 4;
-	else
-		inst = nv_rd32(0x40032c) & 0xfffff;
 
-	for (i = 0; i < dev_priv->engine.fifo.channels; i++) {
-		struct nouveau_channel *chan = dev_priv->fifos[i];
+		for (i = 0; i < dev_priv->engine.fifo.channels; i++) {
+			struct nouveau_channel *chan = dev_priv->fifos[i];
 
-		if (!chan || !chan->ramin_grctx)
-			continue;
+			if (!chan || !chan->ramin_grctx)
+				continue;
 
-		if (dev_priv->card_type < NV_50) {
 			if (inst == chan->ramin_grctx->instance)
 				break;
-		} else {
-			dev_priv->engine.instmem.prepare_access(dev, false);
-			tmp = INSTANCE_RD(chan->ramin_grctx->gpuobj, 0);
-			dev_priv->engine.instmem.finish_access(dev);
+		}
+	} else {
+		inst = (nv_rd32(0x40032c) & 0xfffff) << 12;
 
-			if (inst == tmp)
+		for (i = 0; i < dev_priv->engine.fifo.channels; i++) {
+			struct nouveau_channel *chan = dev_priv->fifos[i];
+
+			if (!chan || !chan->ramin)
+				continue;
+
+			if (inst == chan->ramin->instance)
 				break;
 		}
 	}
+
 
 	return i;
 }
@@ -471,12 +474,12 @@ nouveau_pgraph_intr_context_switch(struct drm_device *dev)
 	switch(dev_priv->card_type) {
 	case NV_04:
 	case NV_05:
-		nouveau_nv04_context_switch(dev);
+		nv04_graph_context_switch(dev);
 		break;
 	case NV_10:
 	case NV_11:
 	case NV_17:
-		nouveau_nv10_context_switch(dev);
+		nv10_graph_context_switch(dev);
 		break;
 	default:
 		NV_ERROR(dev, "Context switch not implemented\n");
@@ -546,6 +549,18 @@ nv50_pgraph_irq_handler(struct drm_device *dev)
 
 		status &= ~0x00000010;
 		nv_wr32(NV03_PGRAPH_INTR, 0x00000010);
+	}
+
+	if (status & 0x00001000) {
+		nv_wr32(0x400500, 0x00000000);
+		nv_wr32(NV03_PGRAPH_INTR, NV_PGRAPH_INTR_CONTEXT_SWITCH);
+		nv_wr32(NV40_PGRAPH_INTR_EN, nv_rd32(
+			NV40_PGRAPH_INTR_EN) & ~NV_PGRAPH_INTR_CONTEXT_SWITCH);
+		nv_wr32(0x400500, 0x00010001);
+
+		nv50_graph_context_switch(dev);
+
+		status &= ~NV_PGRAPH_INTR_CONTEXT_SWITCH;
 	}
 
 	if (status & 0x00100000) {
