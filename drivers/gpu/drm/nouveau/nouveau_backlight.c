@@ -41,7 +41,8 @@
 static int nv40_get_intensity(struct backlight_device *bd)
 {
 	struct drm_device *dev = bl_get_data(bd);
-	int val = (nv_rd32(NV40_PMC_BACKLIGHT) & NV40_PMC_BACKLIGHT_MASK) >> 16;
+	int val = (nv_rd32(dev, NV40_PMC_BACKLIGHT) & NV40_PMC_BACKLIGHT_MASK)
+									>> 16;
 
 	return val;
 }
@@ -50,9 +51,9 @@ static int nv40_set_intensity(struct backlight_device *bd)
 {
 	struct drm_device *dev = bl_get_data(bd);
 	int val = bd->props.brightness;
-	int reg = nv_rd32(NV40_PMC_BACKLIGHT);
+	int reg = nv_rd32(dev, NV40_PMC_BACKLIGHT);
 
-	nv_wr32(NV40_PMC_BACKLIGHT,
+	nv_wr32(dev, NV40_PMC_BACKLIGHT,
 		 (val << 16) | (reg & ~NV40_PMC_BACKLIGHT_MASK));
 
 	return 0;
@@ -70,7 +71,7 @@ static int nv50_get_intensity(struct backlight_device *bd)
 {
 	struct drm_device *dev = bl_get_data(bd);
 
-	return nv_rd32(NV50_PDISPLAY_SOR_BACKLIGHT);
+	return nv_rd32(dev, NV50_PDISPLAY_SOR_BACKLIGHT);
 }
 
 static int nv50_set_intensity(struct backlight_device *bd)
@@ -78,8 +79,8 @@ static int nv50_set_intensity(struct backlight_device *bd)
 	struct drm_device *dev = bl_get_data(bd);
 	int val = bd->props.brightness;
 
-	nv_wr32(NV50_PDISPLAY_SOR_BACKLIGHT, val |
-		NV50_PDISPLAY_SOR_BACKLIGHT_ENABLE);
+	nv_wr32(dev, NV50_PDISPLAY_SOR_BACKLIGHT,
+		val | NV50_PDISPLAY_SOR_BACKLIGHT_ENABLE);
 	return 0;
 }
 
@@ -96,7 +97,7 @@ static int nouveau_nv40_backlight_init(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct backlight_device *bd;
 
-	if (!(nv_rd32(NV40_PMC_BACKLIGHT) & NV40_PMC_BACKLIGHT_MASK))
+	if (!(nv_rd32(dev, NV40_PMC_BACKLIGHT) & NV40_PMC_BACKLIGHT_MASK))
 		return 0;
 
 	bd = backlight_device_register("nv_backlight", &dev->pdev->dev, dev,
@@ -117,7 +118,7 @@ static int nouveau_nv50_backlight_init(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct backlight_device *bd;
 
-	if (!nv_rd32(NV50_PDISPLAY_SOR_BACKLIGHT))
+	if (!nv_rd32(dev, NV50_PDISPLAY_SOR_BACKLIGHT))
 		return 0;
 
 	bd = backlight_device_register("nv_backlight", &dev->pdev->dev, dev,

@@ -74,8 +74,8 @@ nv4e_i2c_setscl(void *data, int state)
 	struct drm_device *dev = i2c->dev;
 	uint8_t val;
 
-	val = (nv_rd32(i2c->wr) & 0xd0) | (state ? 0x20 : 0);
-	nv_wr32(i2c->wr, val | 0x01);
+	val = (nv_rd32(dev, i2c->wr) & 0xd0) | (state ? 0x20 : 0);
+	nv_wr32(dev, i2c->wr, val | 0x01);
 }
 
 static void
@@ -85,8 +85,8 @@ nv4e_i2c_setsda(void *data, int state)
 	struct drm_device *dev = i2c->dev;
 	uint8_t val;
 
-	val = (nv_rd32(i2c->wr) & 0xe0) | (state ? 0x10 : 0);
-	nv_wr32(i2c->wr, val | 0x01);
+	val = (nv_rd32(dev, i2c->wr) & 0xe0) | (state ? 0x10 : 0);
+	nv_wr32(dev, i2c->wr, val | 0x01);
 }
 
 static int
@@ -95,7 +95,7 @@ nv4e_i2c_getscl(void *data)
 	struct nouveau_i2c_chan *i2c = data;
 	struct drm_device *dev = i2c->dev;
 
-	return !!((nv_rd32(i2c->rd) >> 16) & 4);
+	return !!((nv_rd32(dev, i2c->rd) >> 16) & 4);
 }
 
 static int
@@ -104,7 +104,7 @@ nv4e_i2c_getsda(void *data)
 	struct nouveau_i2c_chan *i2c = data;
 	struct drm_device *dev = i2c->dev;
 
-	return !!((nv_rd32(i2c->rd) >> 16) & 8);
+	return !!((nv_rd32(dev, i2c->rd) >> 16) & 8);
 }
 
 static int
@@ -113,7 +113,7 @@ nv50_i2c_getscl(void *data)
 	struct nouveau_i2c_chan *i2c = data;
 	struct drm_device *dev = i2c->dev;
 
-	return !!(nv_rd32(i2c->rd) & 1);
+	return !!(nv_rd32(dev, i2c->rd) & 1);
 }
 
 
@@ -123,7 +123,7 @@ nv50_i2c_getsda(void *data)
 	struct nouveau_i2c_chan *i2c = data;
 	struct drm_device *dev = i2c->dev;
 
-	return !!(nv_rd32(i2c->rd) & 2);
+	return !!(nv_rd32(dev, i2c->rd) & 2);
 }
 
 static void
@@ -132,7 +132,7 @@ nv50_i2c_setscl(void *data, int state)
 	struct nouveau_i2c_chan *i2c = data;
 	struct drm_device *dev = i2c->dev;
 
-	nv_wr32(i2c->wr, 4 | (i2c->data ? 2 : 0) | (state ? 1 : 0));
+	nv_wr32(dev, i2c->wr, 4 | (i2c->data ? 2 : 0) | (state ? 1 : 0));
 }
 
 static void
@@ -141,7 +141,8 @@ nv50_i2c_setsda(void *data, int state)
 	struct nouveau_i2c_chan *i2c = data;
 	struct drm_device *dev = i2c->dev;
 
-	nv_wr32(i2c->wr, (nv_rd32(i2c->rd) & 1) | 4 | (state ? 2 : 0));
+	nv_wr32(dev, i2c->wr,
+			(nv_rd32(dev, i2c->rd) & 1) | 4 | (state ? 2 : 0));
 	i2c->data = state;
 }
 
@@ -150,7 +151,7 @@ const uint32_t nv50_i2c_port[] = {
 	0x00e254, 0x00e274, 0x00e764, 0x00e780,
 	0x00e79c, 0x00e7b8
 };
-#define NV50_I2C_PORTS (sizeof(nv50_i2c_port) / sizeof(nv50_i2c_port[0]))
+#define NV50_I2C_PORTS ARRAY_SIZE(nv50_i2c_port)
 
 int
 nouveau_i2c_new(struct drm_device *dev, const char *name, unsigned index,
