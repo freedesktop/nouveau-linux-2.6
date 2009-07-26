@@ -447,8 +447,8 @@ struct drm_nouveau_private {
 	int chipset;
 	int flags;
 
-	struct drm_local_map *mmio;
-	struct drm_local_map *fb;
+	void __iomem *mmio;
+	void __iomem *fb;
 	struct drm_local_map *ramin;
 
 	struct work_struct irq_work;
@@ -947,76 +947,68 @@ extern int nouveau_gem_ioctl_cpu_fini(struct drm_device *, void *,
 extern int nouveau_gem_ioctl_info(struct drm_device *, void *,
 				  struct drm_file *);
 
+#ifndef ioread32_native
+#ifdef __BIG_ENDIAN
+#define ioread32_native  ioread32be
+#define iowrite32_native iowrite32be
+#else /* def __BIG_ENDIAN */
+#define ioread32_native  ioread32
+#define iowrite32_native iowrite32
+#endif /* def __BIG_ENDIAN else */
+#endif /* !ioread32_native */
+
 #define NVDEV ((struct drm_nouveau_private *)dev->dev_private)
-#if defined(__powerpc__)
-#define nv_out32(map,reg,val) out_be32((void __iomem *)NVDEV->map->handle + (reg), (val))
-#define nv_out16(map,reg,val) out_be16((void __iomem *)NVDEV->map->handle + (reg), (val))
-#define nv_in32(map,reg) in_be32((void __iomem *)NVDEV->map->handle + (reg))
-#define nv_in16(map,reg) in_be16((void __iomem *)NVDEV->map->handle + (reg))
-#else
-#define nv_out32(map,reg,val) DRM_WRITE32(NVDEV->map, (reg), (val))
-#define nv_out16(map,reg,val) DRM_WRITE16(NVDEV->map, (reg), (val))
-#define nv_in32(map,reg) DRM_READ32(NVDEV->map, (reg))
-#define nv_in16(map,reg) DRM_READ16(NVDEV->map, (reg))
-#endif
+#define nv_out32(map, reg, val) \
+	iowrite32_native((val), (void __iomem *)NVDEV->map->handle + (reg))
+#define nv_in32(map, reg) \
+	ioread32_native((void __iomem *)NVDEV->map->handle + (reg))
 
 /* channel control reg access */
-#if defined(__powerpc__)
-#define nvchan_wr32(reg,val) out_be32((void __iomem *)chan->user->handle + (reg), (val))
-#define nvchan_rd32(reg) in_be32((void __iomem *)chan->user->handle + (reg))
-#else
-#define nvchan_wr32(reg,val) DRM_WRITE32(chan->user, (reg), (val))
-#define nvchan_rd32(reg) DRM_READ32(chan->user, (reg))
-#endif
-
+#define nvchan_wr32(reg, val) \
+	iowrite32_native((val), (void __iomem *)chan->user->handle + (reg))
+#define nvchan_rd32(reg) \
+	ioread32_native((void __iomem *)chan->user->handle + (reg))
 
 /* register access */
-#if defined(__powerpc__)
 static inline u32 nv_rd32(struct drm_device *dev, unsigned reg)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	return in_be32((void __force __iomem *)dev_priv->mmio->handle + reg);
+	return ioread32_native(dev_priv->mmio + reg);
 }
 
 static inline void nv_wr32(struct drm_device *dev, unsigned reg, u32 val)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	out_be32((void __force __iomem *)dev_priv->mmio->handle + reg, val);
+	iowrite32_native(val, dev_priv->mmio + reg);
 }
-#else
-static inline u32 nv_rd32(struct drm_device *dev, unsigned reg)
-{
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	return readl((void __force __iomem *)dev_priv->mmio->handle + reg);
-}
-
-static inline void nv_wr32(struct drm_device *dev, unsigned reg, u32 val)
-{
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	writel(val, (void __force __iomem *)dev_priv->mmio->handle + reg);
-}
-#endif /* not __powerpc__ */
 
 static inline u8 nv_rd08(struct drm_device *dev, unsigned reg)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	return readb((void __force __iomem *)dev_priv->mmio->handle + reg);
+	return ioread8(dev_priv->mmio + reg);
 }
 
 static inline void nv_wr08(struct drm_device *dev, unsigned reg, u8 val)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	writeb(val, (void __force __iomem *)dev_priv->mmio->handle + reg);
+	iowrite8(val, dev_priv->mmio + reg);
 }
 
 #define nv_wait(reg,mask,val) nouveau_wait_until(dev, 2000000000ULL, (reg),    \
 						 (mask), (val))
 
 /* VRAM access */
-#define nv_rf32(reg) nv_in32(fb, (reg))
-#define nv_wf32(reg,val) nv_out32(fb, (reg), (val))
-#define nv_rv32(reg) nv_rf32(reg)
-#define nv_wv32(reg,val) nv_wf32(reg, val)
+static inline u32 nv_rf32(struct drm_device *dev, unsigned reg)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	return ioread32_native(dev_priv->fb + reg);
+}
+
+static inline void nv_wf32(struct drm_device *dev, unsigned reg, u32 val)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	iowrite32_native(val, dev_priv->fb + reg);
+}
 
 /* PRAMIN access */
 #define nv_ri32(reg) nv_in32(ramin, (reg))
