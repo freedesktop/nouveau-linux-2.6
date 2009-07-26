@@ -443,19 +443,38 @@ int nouveau_firstopen(struct drm_device *dev)
 	return 0;
 }
 
+/* if we have an OF card, copy vbios to RAMIN */
+static void nouveau_OF_copy_vbios_to_ramin(struct drm_device *dev)
+{
+#if defined(__powerpc__)
+	int size, i;
+	const uint32_t *bios;
+	struct device_node *dn = pci_device_to_OF_node(dev->pdev);
+	if (!dn) {
+		NV_INFO(dev, "Unable to get the OF node\n");
+		return;
+	}
+
+	bios = of_get_property(dn, "NVDA,BMP", &size);
+	if (bios) {
+		for (i = 0; i < size; i += 4)
+			nv_wi32(dev, i, bios[i/4]);
+		NV_INFO(dev, "OF bios successfully copied (%d bytes)\n", size);
+	} else {
+		NV_INFO(dev, "Unable to get the OF bios\n");
+	}
+#endif
+}
+
 #define NV40_CHIPSET_MASK 0x00000baf
 #define NV44_CHIPSET_MASK 0x00005450
 
 int nouveau_load(struct drm_device *dev, unsigned long flags)
 {
 	struct drm_nouveau_private *dev_priv;
-#if defined(__powerpc__)
-	struct device_node *dn;
-#endif
 	uint32_t reg0;
 	uint8_t architecture = 0;
 	resource_size_t mmio_start_offs;
-	int ret;
 
 	dev_priv = kzalloc(sizeof(*dev_priv), GFP_KERNEL);
 	if (!dev_priv)
@@ -548,33 +567,29 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	/* map larger RAMIN aperture on NV40 cards */
 	dev_priv->ramin  = NULL;
 	if (dev_priv->card_type >= NV_40) {
-		int ramin_resource = 2;
-		if (drm_get_resource_len(dev, ramin_resource) == 0)
-			ramin_resource = 3;
+		int ramin_bar = 2;
+		if (pci_resource_len(dev->pdev, ramin_bar) == 0)
+			ramin_bar = 3;
 
-		ret = drm_addmap(dev,
-				 drm_get_resource_start(dev, ramin_resource),
-				 drm_get_resource_len(dev, ramin_resource),
-				 _DRM_REGISTERS, _DRM_READ_ONLY |
-				 _DRM_DRIVER, &dev_priv->ramin);
-		if (ret) {
+		dev_priv->ramin_size = pci_resource_len(dev->pdev, ramin_bar);
+		dev_priv->ramin = ioremap(
+				pci_resource_start(dev->pdev, ramin_bar),
+				dev_priv->ramin_size);
+		if (!dev_priv->ramin) {
 			NV_ERROR(dev, "Failed to init RAMIN mapping, "
 				      "limited instance memory available\n");
-			dev_priv->ramin = NULL;
 		}
 	}
 
 	/* On older cards (or if the above failed), create a map covering
 	 * the BAR0 PRAMIN aperture */
 	if (!dev_priv->ramin) {
-		ret = drm_addmap(dev,
-				 drm_get_resource_start(dev, 0) + NV_RAMIN,
-				 (1*1024*1024),
-				 _DRM_REGISTERS, _DRM_READ_ONLY | _DRM_DRIVER,
-				 &dev_priv->ramin);
-		if (ret) {
-			NV_ERROR(dev, "Failed to map BAR0 PRAMIN: %d\n", ret);
-			return ret;
+		dev_priv->ramin_size = 1 * 1024 * 1024;
+		dev_priv->ramin = ioremap(mmio_start_offs + NV_RAMIN,
+							dev_priv->ramin_size);
+		if (!dev_priv->ramin) {
+			NV_ERROR(dev, "Failed to map BAR0 PRAMIN.\n");
+			return -ENOMEM;
 		}
 	}
 
@@ -585,23 +600,7 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 		return -ENOMEM;
 	}
 
-#if defined(__powerpc__)
-	/* if we have an OF card, copy vbios to RAMIN */
-	dn = pci_device_to_OF_node(dev->pdev);
-	if (dn)
-	{
-		int size, i;
-		const uint32_t *bios = of_get_property(dn, "NVDA,BMP", &size);
-		if (bios) {
-			for (i = 0; i < size; i+=4)
-				nv_out32(ramin, i, bios[i/4]);
-			NV_INFO(dev, "OF bios successfully copied (%d bytes)\n",size);
-		} else
-			NV_INFO(dev, "Unable to get the OF bios\n");
-	}
-	else
-		NV_INFO(dev, "Unable to get the OF node\n");
-#endif
+	nouveau_OF_copy_vbios_to_ramin(dev);
 
 	/* Special flags */
 	if (dev->pci_device == 0x01a0) {
@@ -610,11 +609,9 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 		dev_priv->flags |= NV_NFORCE2;
 	}
 
-	dev->dev_private = (void *)dev_priv;
-
 	/* For kernel modesetting, init card now and bring up fbcon */
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
-		ret = nouveau_card_init(dev);
+		int ret = nouveau_card_init(dev);
 		if (ret)
 			return ret;
 	}
@@ -622,7 +619,7 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	return 0;
 }
 
-void nouveau_close(struct drm_device *dev)
+static void nouveau_close(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 
@@ -653,7 +650,7 @@ int nouveau_unload(struct drm_device *dev)
 	}
 
 	iounmap(dev_priv->mmio);
-	drm_rmmap(dev, dev_priv->ramin);
+	iounmap(dev_priv->ramin);
 	iounmap(dev_priv->fb);
 
 	kfree(dev_priv);
@@ -854,7 +851,7 @@ static int nouveau_suspend(struct drm_device *dev)
 
 	engine->instmem.prepare_access(dev, false);
 	for (i = 0; i < susres->ramin_size / 4; i++)
-		susres->ramin_copy[i] = nv_ri32(i << 2);
+		susres->ramin_copy[i] = nv_ri32(dev, i << 2);
 	engine->instmem.finish_access(dev);
 
 	/* reenable the fifo caches */
@@ -898,7 +895,7 @@ static int nouveau_resume(struct drm_device *dev)
 
 	dev_priv->engine.instmem.prepare_access(dev, true);
 	for (i = 0; i < susres->ramin_size / 4; i++)
-		nv_wi32(i << 2, susres->ramin_copy[i]);
+		nv_wi32(dev, i << 2, susres->ramin_copy[i]);
 	dev_priv->engine.instmem.finish_access(dev);
 
 	engine->mc.init(dev);
@@ -920,7 +917,7 @@ static int nouveau_resume(struct drm_device *dev)
 	 */
 	dev_priv->engine.instmem.prepare_access(dev, true);
 	for (i = 0; i < susres->ramin_size / 4; i++)
-		nv_wi32(i << 2, susres->ramin_copy[i]);
+		nv_wi32(dev, i << 2, susres->ramin_copy[i]);
 	dev_priv->engine.instmem.finish_access(dev);
 
 	engine->fifo.load_context(dev_priv->fifos[0]);

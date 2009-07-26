@@ -94,7 +94,7 @@ nouveau_mem_alloc_block(struct mem_block *heap, uint64_t size,
 		list_for_each_prev(p, heap) {
 			uint64_t start = ((p->start + p->size) - size) & ~mask;
 
-			if (p->file_priv == 0 && start >= p->start &&
+			if (p->file_priv == NULL && start >= p->start &&
 			    start + size <= p->start + p->size)
 				return split_block(p, start, size, file_priv);
 		}
@@ -102,7 +102,7 @@ nouveau_mem_alloc_block(struct mem_block *heap, uint64_t size,
 		list_for_each(p, heap) {
 			uint64_t start = (p->start + mask) & ~mask;
 
-			if (p->file_priv == 0 &&
+			if (p->file_priv == NULL &&
 			    start + size <= p->start + p->size)
 				return split_block(p, start, size, file_priv);
 		}
@@ -118,7 +118,7 @@ void nouveau_mem_free_block(struct mem_block *p)
 	/* Assumes a single contiguous range.  Needs a special file_priv in
 	 * 'heap' to stop it being subsumed.
 	 */
-	if (p->next->file_priv == 0) {
+	if (p->next->file_priv == NULL) {
 		struct mem_block *q = p->next;
 		p->size += q->size;
 		p->next = q->next;
@@ -126,7 +126,7 @@ void nouveau_mem_free_block(struct mem_block *p)
 		kfree(q);
 	}
 
-	if (p->prev->file_priv == 0) {
+	if (p->prev->file_priv == NULL) {
 		struct mem_block *q = p->prev;
 		q->size += p->size;
 		q->next = p->next;
@@ -181,8 +181,9 @@ void nouveau_mem_release(struct drm_file *file_priv, struct mem_block *heap)
 	 * 'heap' to stop it being subsumed.
 	 */
 	list_for_each(p, heap) {
-		while ((p->file_priv == 0) && (p->next->file_priv == 0) &&
-		       (p->next!=heap)) {
+		while ((p->file_priv == NULL) &&
+					(p->next->file_priv == NULL) &&
+					(p->next != heap)) {
 			struct mem_block *q = p->next;
 			p->size += q->size;
 			p->next = q->next;
@@ -230,8 +231,8 @@ nv50_mem_vm_bind_linear(struct drm_device *dev, uint64_t virt, uint32_t size,
 			struct nouveau_gpuobj *pt = pgt[virt >> 29];
 			unsigned pte = ((virt & 0x1fffffffULL) >> psz) << 1;
 
-			INSTANCE_WR(pt, pte++, 0x00000000);
-			INSTANCE_WR(pt, pte++, 0x00000000);
+			nv_wo32(dev, pt, pte++, 0x00000000);
+			nv_wo32(dev, pt, pte++, 0x00000000);
 
 			virt += (1 << psz);
 		}
@@ -242,8 +243,8 @@ nv50_mem_vm_bind_linear(struct drm_device *dev, uint64_t virt, uint32_t size,
 			unsigned offset_h = upper_32_bits(phys) & 0xff;
 			unsigned offset_l = lower_32_bits(phys);
 
-			INSTANCE_WR(pt, pte++, offset_l | pfl);
-			INSTANCE_WR(pt, pte++, offset_h | flags);
+			nv_wo32(dev, pt, pte++, offset_l | pfl);
+			nv_wo32(dev, pt, pte++, offset_h | flags);
 
 			phys += (1 << psz);
 			virt += (1 << psz);

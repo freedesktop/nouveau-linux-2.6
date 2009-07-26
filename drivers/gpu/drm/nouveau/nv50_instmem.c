@@ -86,13 +86,12 @@ nv50_instmem_init(struct drm_device *dev)
 	c_vmpd   = ((dev_priv->chipset & 0xf0) == 0x50) ? 0x1400 : 0x200;
 	c_ramfc  = ((dev_priv->chipset & 0xf0) == 0x50) ? 0x0 : 0x20;
 	c_base   = c_vmpd + 0x4000;
-	pt_size  = NV50_INSTMEM_PT_SIZE(dev_priv->ramin->size);
+	pt_size  = NV50_INSTMEM_PT_SIZE(dev_priv->ramin_size);
 
 	NV_DEBUG(dev, " Rsvd VRAM base: 0x%08x\n", c_offset);
 	NV_DEBUG(dev, "    VBIOS image: 0x%08x\n",
 				(nv_rd32(dev, 0x619f04) & ~0xff) << 8);
-	NV_DEBUG(dev, "  Aperture size: %d MiB\n",
-		 (uint32_t)dev_priv->ramin->size >> 20);
+	NV_DEBUG(dev, "  Aperture size: %d MiB\n", dev_priv->ramin_size >> 20);
 	NV_DEBUG(dev, "        PT size: %d KiB\n", pt_size >> 10);
 
 	/* Determine VM layout, we need to do this first to make sure
@@ -209,7 +208,7 @@ nv50_instmem_init(struct drm_device *dev)
 					  &priv->pramin_bar)))
 		return ret;
 	BAR0_WI32(priv->pramin_bar->gpuobj, 0x00, 0x7fc00000);
-	BAR0_WI32(priv->pramin_bar->gpuobj, 0x04, dev_priv->ramin->size - 1);
+	BAR0_WI32(priv->pramin_bar->gpuobj, 0x04, dev_priv->ramin_size - 1);
 	BAR0_WI32(priv->pramin_bar->gpuobj, 0x08, 0x00000000);
 	BAR0_WI32(priv->pramin_bar->gpuobj, 0x0c, 0x00000000);
 	BAR0_WI32(priv->pramin_bar->gpuobj, 0x10, 0x00000000);
@@ -244,7 +243,7 @@ nv50_instmem_init(struct drm_device *dev)
 	 * entire fake channel back from the PRAMIN BAR */
 	dev_priv->engine.instmem.prepare_access(dev, false);
 	for (i = 0; i < c_size; i+=4) {
-		if (nv_rd32(dev, NV_RAMIN + i) != nv_ri32(i)) {
+		if (nv_rd32(dev, NV_RAMIN + i) != nv_ri32(dev, i)) {
 			NV_ERROR(dev, "Error reading back PRAMIN at 0x%08x\n", i);
 			dev_priv->engine.instmem.finish_access(dev);
 			return -EINVAL;
@@ -256,7 +255,7 @@ nv50_instmem_init(struct drm_device *dev)
 
 	/* Global PRAMIN heap */
 	if (nouveau_mem_init_heap(&dev_priv->ramin_heap,
-				  c_size, dev_priv->ramin->size - c_size)) {
+				  c_size, dev_priv->ramin_size - c_size)) {
 		dev_priv->ramin_heap = NULL;
 		NV_ERROR(dev, "Failed to init RAMIN heap\n");
 	}
@@ -293,7 +292,7 @@ nv50_instmem_takedown(struct drm_device *dev)
 	if (chan) {
 		for (i = 0; i < dev_priv->vm_vram_pt_nr; i++) {
 			nouveau_gpuobj_ref_del(dev, &chan->vm_vram_pt[i]);
-			dev_priv->vm_vram_pt[i] = 0;
+			dev_priv->vm_vram_pt[i] = NULL;
 		}
 		dev_priv->vm_vram_pt_nr = 0;
 
@@ -323,7 +322,7 @@ nv50_instmem_suspend(struct drm_device *dev)
 		return -ENOMEM;
 
 	for (i = 0; i < ramin->im_pramin->size; i += 4)
-		ramin->im_backing_suspend[i/4] = nv_ri32(i);
+		ramin->im_backing_suspend[i/4] = nv_ri32(dev, i);
 	return 0;
 }
 
@@ -425,8 +424,8 @@ nv50_instmem_bind(struct drm_device *dev, struct nouveau_gpuobj *gpuobj)
 
 	dev_priv->engine.instmem.prepare_access(dev, true);
 	while (pte < pte_end) {
-		INSTANCE_WR(priv->pramin_pt->gpuobj, (pte + 0)/4, vram | 1);
-		INSTANCE_WR(priv->pramin_pt->gpuobj, (pte + 4)/4, 0x00000000);
+		nv_wo32(dev, priv->pramin_pt->gpuobj, (pte + 0)/4, vram | 1);
+		nv_wo32(dev, priv->pramin_pt->gpuobj, (pte + 4)/4, 0x00000000);
 
 		pte += 8;
 		vram += NV50_INSTMEM_PAGE_SIZE;
@@ -466,8 +465,8 @@ nv50_instmem_unbind(struct drm_device *dev, struct nouveau_gpuobj *gpuobj)
 
 	dev_priv->engine.instmem.prepare_access(dev, true);
 	while (pte < pte_end) {
-		INSTANCE_WR(priv->pramin_pt->gpuobj, (pte + 0)/4, 0x00000009);
-		INSTANCE_WR(priv->pramin_pt->gpuobj, (pte + 4)/4, 0x00000000);
+		nv_wo32(dev, priv->pramin_pt->gpuobj, (pte + 0)/4, 0x00000009);
+		nv_wo32(dev, priv->pramin_pt->gpuobj, (pte + 4)/4, 0x00000000);
 		pte += 8;
 	}
 	dev_priv->engine.instmem.finish_access(dev);

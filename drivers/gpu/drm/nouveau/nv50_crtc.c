@@ -423,7 +423,7 @@ nv50_crtc_cursor_move(struct drm_crtc *drm_crtc, int x, int y)
 	return 0;
 }
 
-void
+static void
 nv50_crtc_gamma_set(struct drm_crtc *drm_crtc, u16 *r, u16 *g, u16 *b,
 		    uint32_t size)
 {
@@ -543,9 +543,8 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 		return ret;
 
 	if (old_fb) {
-		struct nouveau_framebuffer *fb = nouveau_framebuffer(old_fb);
-
-		nouveau_bo_unpin(fb->nvbo);
+		struct nouveau_framebuffer *ofb = nouveau_framebuffer(old_fb);
+		nouveau_bo_unpin(ofb->nvbo);
 	}
 
 	crtc->fb.offset = fb->nvbo->bo.offset;

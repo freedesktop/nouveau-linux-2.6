@@ -544,11 +544,11 @@ nv04_graph_mthd_set_operation(struct nouveau_channel *chan, int grclass,
 	int subc = (nv_rd32(dev, NV04_PGRAPH_TRAPPED_ADDR) >> 13) & 0x7;
 	uint32_t tmp;
 
-	tmp  = nv_ri32(instance);
+	tmp  = nv_ri32(dev, instance);
 	tmp &= ~0x00038000;
 	tmp |= ((data & 7) << 15);
 
-	nv_wi32(instance, tmp);
+	nv_wi32(dev, instance, tmp);
 	nv_wr32(dev, NV04_PGRAPH_CTX_SWITCH1, tmp);
 	nv_wr32(dev, NV04_PGRAPH_CTX_CACHE1 + subc, tmp);
 	return 0;
@@ -559,7 +559,7 @@ static struct nouveau_pgraph_object_method nv04_graph_mthds_m2mf[] = {
 	{}
 };
 
-struct nouveau_pgraph_object_method nv04_graph_mthds_set_operation[] = {
+static struct nouveau_pgraph_object_method nv04_graph_mthds_set_operation[] = {
 	{ 0x02fc, nv04_graph_mthd_set_operation },
 	{},
 };
