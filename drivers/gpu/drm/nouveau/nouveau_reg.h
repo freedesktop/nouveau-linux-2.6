@@ -689,15 +689,16 @@
 
 #define NV50_PDISPLAY                                                0x00610000
 #define NV50_PDISPLAY_OBJECTS                                        0x00610010
-#define NV50_PDISPLAY_INTR                                           0x00610024
-#define NV50_PDISPLAY_INTR_VBLANK_CRTC                               0x0000000c
-#define NV50_PDISPLAY_INTR_VBLANK_CRTC_SHIFT                                  2
-#define NV50_PDISPLAY_INTR_VBLANK_CRTC_(n)                      (1 << ((n) + 2))
-#define NV50_PDISPLAY_INTR_VBLANK_CRTC_0                             0x00000004
-#define NV50_PDISPLAY_INTR_VBLANK_CRTC_1                             0x00000008
-#define NV50_PDISPLAY_INTR_CLK_UNK10                                 0x00000010
-#define NV50_PDISPLAY_INTR_CLK_UNK20                                 0x00000020
-#define NV50_PDISPLAY_INTR_CLK_UNK40                                 0x00000040
+#define NV50_PDISPLAY_INTR_0                                         0x00610020
+#define NV50_PDISPLAY_INTR_1                                         0x00610024
+#define NV50_PDISPLAY_INTR_1_VBLANK_CRTC                             0x0000000c
+#define NV50_PDISPLAY_INTR_1_VBLANK_CRTC_SHIFT                                2
+#define NV50_PDISPLAY_INTR_1_VBLANK_CRTC_(n)                   (1 << ((n) + 2))
+#define NV50_PDISPLAY_INTR_1_VBLANK_CRTC_0                           0x00000004
+#define NV50_PDISPLAY_INTR_1_VBLANK_CRTC_1                           0x00000008
+#define NV50_PDISPLAY_INTR_1_CLK_UNK10                               0x00000010
+#define NV50_PDISPLAY_INTR_1_CLK_UNK20                               0x00000020
+#define NV50_PDISPLAY_INTR_1_CLK_UNK40                               0x00000040
 #define NV50_PDISPLAY_INTR_EN                                        0x0061002c
 #define NV50_PDISPLAY_INTR_EN_VBLANK_CRTC                            0x0000000c
 #define NV50_PDISPLAY_INTR_EN_VBLANK_CRTC_(n)                   (1 << ((n) + 2))
@@ -710,6 +711,8 @@
 #define NV50_PDISPLAY_UNK30_CTRL_UPDATE_VCLK0                        0x00000200
 #define NV50_PDISPLAY_UNK30_CTRL_UPDATE_VCLK1                        0x00000400
 #define NV50_PDISPLAY_UNK30_CTRL_PENDING                             0x80000000
+#define NV50_PDISPLAY_TRAPPED_ADDR                                   0x00610080
+#define NV50_PDISPLAY_TRAPPED_DATA                                   0x00610084
 #define NV50_PDISPLAY_CHANNEL_STAT(i)                  ((i) * 0x10 + 0x00610200)
 #define NV50_PDISPLAY_CHANNEL_STAT_DMA                               0x00000010
 #define NV50_PDISPLAY_CHANNEL_STAT_DMA_DISABLED                      0x00000000

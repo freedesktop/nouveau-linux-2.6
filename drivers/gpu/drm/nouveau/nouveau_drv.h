@@ -34,7 +34,7 @@
 
 #define DRIVER_MAJOR		0
 #define DRIVER_MINOR		0
-#define DRIVER_PATCHLEVEL	14
+#define DRIVER_PATCHLEVEL	15
 
 #define NOUVEAU_FAMILY   0x0000FFFF
 #define NOUVEAU_FLAGS    0xFFFF0000
@@ -192,7 +192,6 @@ struct nouveau_channel
 	/* Notifier memory */
 	struct nouveau_bo *notifier_bo;
 	struct mem_block *notifier_heap;
-	struct drm_local_map *notifier_map;
 
 	/* PFIFO context */
 	struct nouveau_gpuobj_ref *ramfc;
@@ -433,6 +432,20 @@ struct nv04_mode_state {
 	struct nv04_crtc_reg crtc_reg[2];
 };
 
+enum nouveau_card_type {
+	NV_UNKNOWN = 0,
+	NV_04      = 4,
+	NV_05      = 5,
+	NV_10      = 10,
+	NV_11      = 11,
+	NV_17      = 17,
+	NV_20      = 20,
+	NV_30      = 30,
+	NV_40      = 40,
+	NV_44      = 44,
+	NV_50      = 50,
+};
+
 struct drm_nouveau_private {
 	struct drm_device *dev;
 	enum {
@@ -442,7 +455,7 @@ struct drm_nouveau_private {
 	} init_state;
 
 	/* the card type, takes NV_* as values */
-	int card_type;
+	enum nouveau_card_type card_type;
 	/* exact chipset, derived from NV_PMC_BOOT_0 */
 	int chipset;
 	int flags;
@@ -725,7 +738,8 @@ static inline void nouveau_backlight_exit(struct drm_device *dev) { }
 #endif
 
 /* nouveau_bios.c */
-extern int nouveau_parse_bios(struct drm_device *);
+extern int nouveau_bios_init(struct drm_device *);
+extern void nouveau_bios_takedown(struct drm_device *dev);
 extern int nouveau_run_vbios_init(struct drm_device *);
 extern int get_pll_limits(struct drm_device *, uint32_t limit_match,
 			  struct pll_lims *);
@@ -1115,5 +1129,15 @@ nv_two_reg_pll(struct drm_device *dev)
 		return true;
 	return false;
 }
+
+#define NV50_NVSW                                                    0x0000506e
+#define NV50_NVSW_DMA_SEMAPHORE                                      0x00000060
+#define NV50_NVSW_SEMAPHORE_OFFSET                                   0x00000064
+#define NV50_NVSW_SEMAPHORE_ACQUIRE                                  0x00000068
+#define NV50_NVSW_SEMAPHORE_RELEASE                                  0x0000006c
+#define NV50_NVSW_DMA_VBLSEM                                         0x0000018c
+#define NV50_NVSW_VBLSEM_OFFSET                                      0x00000400
+#define NV50_NVSW_VBLSEM_RELEASE_VALUE                               0x00000404
+#define NV50_NVSW_VBLSEM_RELEASE                                     0x00000408
 
 #endif /* __NOUVEAU_DRV_H__ */

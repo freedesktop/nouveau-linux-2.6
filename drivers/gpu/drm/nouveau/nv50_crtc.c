@@ -141,7 +141,10 @@ nv50_crtc_blank(struct nouveau_crtc *crtc, bool blanked)
 		OUT_RING  (evo, 0);
 		BEGIN_RING(evo, 0, NV50_EVO_CRTC(index, FB_DMA), 1);
 		if (dev_priv->chipset != 0x50 && crtc->fb.tiled)
-			OUT_RING(evo, NvEvoVM);
+			if (crtc->fb.cpp == 2)
+				OUT_RING(evo, NvEvoFB16);
+			else
+				OUT_RING(evo, NvEvoFB32);
 		else
 			OUT_RING(evo, NvEvoVRAM);
 	}
@@ -536,7 +539,18 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 	struct nouveau_channel *evo = dev_priv->evo;
 	struct drm_framebuffer *drm_fb = crtc->base.fb;
 	struct nouveau_framebuffer *fb = nouveau_framebuffer(drm_fb);
-	int ret;
+	int ret, format;
+
+	switch (drm_fb->depth) {
+	case  8: format = NV50_EVO_CRTC_FB_DEPTH_8; break;
+	case 15: format = NV50_EVO_CRTC_FB_DEPTH_15; break;
+	case 16: format = NV50_EVO_CRTC_FB_DEPTH_16; break;
+	case 24: format = NV50_EVO_CRTC_FB_DEPTH_24; break;
+	case 30: format = NV50_EVO_CRTC_FB_DEPTH_30; break;
+	default:
+		 NV_ERROR(dev, "unknown depth %d\n", drm_fb->depth);
+		 return -EINVAL;
+	}
 
 	ret = nouveau_bo_pin(fb->nvbo, TTM_PL_FLAG_VRAM);
 	if (ret)
@@ -552,12 +566,20 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 	if (!crtc->fb.tiled || dev_priv->chipset == 0x50)
 		crtc->fb.offset -= dev_priv->vm_vram_base;
 
+	crtc->fb.cpp = drm_fb->bits_per_pixel / 8;
 	if (!crtc->fb.blanked && dev_priv->chipset != 0x50) {
 		ret = RING_SPACE(evo, 2);
 		if (ret)
 			return ret;
+
 		BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, FB_DMA), 1);
-		OUT_RING  (evo, crtc->fb.tiled ? NvEvoVM : NvEvoVRAM);
+		if (crtc->fb.tiled) {
+			if (crtc->fb.cpp == 4)
+				OUT_RING  (evo, NvEvoFB32);
+			else
+				OUT_RING  (evo, NvEvoFB16);
+		} else
+			OUT_RING  (evo, NvEvoVRAM);
 	}
 
 	ret = RING_SPACE(evo, 10);
@@ -568,27 +590,13 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 	OUT_RING  (evo, crtc->fb.offset >> 8);
 	OUT_RING  (evo, 0);
 	OUT_RING  (evo, (drm_fb->height << 16) | drm_fb->width);
-	if (!crtc->fb.tiled)
+	if (!crtc->fb.tiled) {
 		OUT_RING  (evo, drm_fb->pitch | (1 << 20));
-	else
-		OUT_RING  (evo, (drm_fb->width << 4) | fb->nvbo->tile_mode);
-	switch (drm_fb->depth) {
-	case 8:
-		OUT_RING  (evo, NV50_EVO_CRTC_FB_DEPTH_8);
-		break;
-	case 15:
-		OUT_RING  (evo, NV50_EVO_CRTC_FB_DEPTH_15);
-		break;
-	case 16:
-		OUT_RING  (evo, NV50_EVO_CRTC_FB_DEPTH_16);
-		break;
-	case 24:
-		OUT_RING  (evo, NV50_EVO_CRTC_FB_DEPTH_24);
-		break;
-	case 30:
-		OUT_RING  (evo, NV50_EVO_CRTC_FB_DEPTH_30);
-		break;
+	} else {
+		OUT_RING  (evo, ((drm_fb->pitch / 4) << 4) |
+				  fb->nvbo->tile_mode);
 	}
+	OUT_RING  (evo, format);
 
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, COLOR_CTRL), 1);
 	OUT_RING  (evo, NV50_EVO_CRTC_COLOR_CTRL_COLOR);
