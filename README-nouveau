@@ -40,11 +40,10 @@ $ ln -s /path/to/nouveau/kernel/include/drm include/drm
 $ mv drivers/gpu/drm drivers/gpu/drm_orig
 $ ln -s /path/to/nouveau/kernel/drivers/gpu/drm drivers/gpu/drm
 
-Then reconfigure and build your *host* kernel as usual. You need to
-enable DRM_TTM to get DRM_NOUVEAU. It is recommended to build
-all DRM, DRM_TTM and DRM_NOUVEAU as modules (drm.ko, ttm.ko, nouveau.ko).
-Also make sure you get fbcon.ko (FRAMEBUFFER_CONSOLE) or build it in(?).
-It should be loaded if you 'modprobe nouveau modeset=1', otherwise you
+Then reconfigure and build your *host* kernel as usual. It is recommended to
+build all DRM and DRM_NOUVEAU as modules (drm.ko, ttm.ko, nouveau.ko).
+Also make sure you get fbcon.ko (FRAMEBUFFER_CONSOLE) or preferrably build it
+in. It should be loaded if you 'modprobe nouveau modeset=1', otherwise you
 just get an unusable picture.
 
 $ make oldconfig
