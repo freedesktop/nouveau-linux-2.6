@@ -482,19 +482,21 @@ int nv50_display_create(struct drm_device *dev)
 			continue;
 		}
 
-		connector[entry->i2c_index] |= (1 << entry->type);
+		connector[entry->connector] |= (1 << entry->type);
 	}
 
-	/* Look at which encoders are attached to each i2c bus to
-	 * determine which connectors are present.
+	/* It appears that DCB 3.0+ VBIOS has a connector table, however,
+	 * I'm not 100% certain how to decode it correctly yet so just
+	 * look at what encoders are present on each connector index and
+	 * attempt to derive the connector type from that.
 	 */
 	for (i = 0 ; i < dcb->entries; i++) {
 		struct dcb_entry *entry = &dcb->entry[i];
 		uint16_t encoders;
 		int type;
 
-		encoders = connector[entry->i2c_index];
-		connector[entry->i2c_index] = 0;
+		encoders = connector[entry->connector];
+		connector[entry->connector] = 0;
 
 		/* already done? */
 		if (!encoders)
@@ -517,7 +519,7 @@ int nv50_display_create(struct drm_device *dev)
 		if (type == DRM_MODE_CONNECTOR_Unknown)
 			continue;
 
-		nv50_connector_create(dev, entry->i2c_index, type);
+		nouveau_connector_create(dev, entry->i2c_index, type);
 	}
 
 	ret = nv50_display_init(dev);
@@ -652,14 +654,17 @@ nv50_display_vblank_crtc_handler(struct drm_device *dev, int crtc)
 static void
 nv50_display_vblank_handler(struct drm_device *dev, uint32_t intr)
 {
+	intr &= NV50_PDISPLAY_INTR_1_VBLANK_CRTC;
+
 	if (intr & NV50_PDISPLAY_INTR_1_VBLANK_CRTC_0)
 		nv50_display_vblank_crtc_handler(dev, 0);
 
 	if (intr & NV50_PDISPLAY_INTR_1_VBLANK_CRTC_1)
 		nv50_display_vblank_crtc_handler(dev, 1);
 
-	nv_wr32(dev, NV50_PDISPLAY_INTR_1,
-		     intr & NV50_PDISPLAY_INTR_1_VBLANK_CRTC);
+	nv_wr32(dev, NV50_PDISPLAY_INTR_EN, nv_rd32(dev,
+		     NV50_PDISPLAY_INTR_EN) & ~intr);
+	nv_wr32(dev, NV50_PDISPLAY_INTR_1, intr);
 }
 
 static void

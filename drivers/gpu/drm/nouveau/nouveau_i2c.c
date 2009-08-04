@@ -213,8 +213,8 @@ nouveau_i2c_new(struct drm_device *dev, const char *name, unsigned index,
 		kfree(i2c);
 		return -EINVAL;
 	}
-	i2c->algo.udelay = 20;
-	i2c->algo.timeout = usecs_to_jiffies(2200);
+	i2c->algo.udelay = 40;
+	i2c->algo.timeout = usecs_to_jiffies(5000);
 	i2c->algo.data = i2c;
 
 	i2c_set_adapdata(&i2c->adapter, i2c);
@@ -244,31 +244,3 @@ nouveau_i2c_del(struct nouveau_i2c_chan **pi2c)
 	kfree(i2c);
 }
 
-bool
-nouveau_i2c_detect(struct nouveau_connector *connector)
-{
-	/* kindly borrrowed from the intel driver, hope it works. */
-	uint8_t out_buf[] = { 0x0, 0x0};
-	uint8_t buf[2];
-	bool ret;
-	struct i2c_msg msgs[] = {
-		{
-			.addr = 0x50,
-			.flags = 0,
-			.len = 1,
-			.buf = out_buf,
-		},
-		{
-			.addr = 0x50,
-			.flags = I2C_M_RD,
-			.len = 1,
-			.buf = buf,
-		}
-	};
-
-	if (!connector->i2c_chan)
-		return false;
-
-	ret = (i2c_transfer(&connector->i2c_chan->adapter, msgs, 2) == 2);
-	return ret;
-}
