@@ -51,12 +51,6 @@ struct nouveau_fpriv {
 
 #define DRM_FILE_PAGE_OFFSET (0x100000000ULL >> PAGE_SHIFT)
 
-#define nouveau_bdev(_bd) \
-	container_of(_bd, struct drm_nouveau_private, ttm.bdev)
-
-#define nouveau_fdev(_fd) \
-	container_of(_fd, struct drm_nouveau_private, ttm.fdev)
-
 #include "nouveau_drm.h"
 #include "nouveau_reg.h"
 #include "nouveau_bios.h"
@@ -560,6 +554,12 @@ struct drm_nouveau_private {
 	struct nouveau_channel *evo;
 };
 
+static inline struct drm_nouveau_private *
+nouveau_bdev(struct ttm_bo_device *bd)
+{
+	return container_of(bd, struct drm_nouveau_private, ttm.bdev);
+}
+
 static inline int
 nouveau_bo_ref(struct nouveau_bo *ref, struct nouveau_bo **pnvbo)
 {
@@ -596,6 +596,13 @@ nouveau_bo_ref(struct nouveau_bo *ref, struct nouveau_bo **pnvbo)
 	}                                                        \
 	(ch) = nv->fifos[(id)];                                  \
 } while(0)
+
+/* nouveau_drv.c */
+extern int nouveau_noagp;
+extern int nouveau_duallink;
+extern int nouveau_uscript_lvds;
+extern int nouveau_uscript_tmds;
+extern int nouveau_fbpercrtc;
 
 /* nouveau_state.c */
 extern void nouveau_preclose(struct drm_device *dev, struct drm_file *);
@@ -649,6 +656,8 @@ extern int  nouveau_ioctl_notifier_free(struct drm_device *, void *data,
 					struct drm_file *);
 
 /* nouveau_fifo.c */
+extern struct drm_ioctl_desc nouveau_ioctls[];
+extern int nouveau_max_ioctl;
 extern int  nouveau_fifo_init(struct drm_device *);
 extern int  nouveau_fifo_ctx_size(struct drm_device *);
 extern void nouveau_fifo_cleanup(struct drm_device *, struct drm_file *);

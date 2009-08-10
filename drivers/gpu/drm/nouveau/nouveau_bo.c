@@ -72,6 +72,22 @@ nouveau_bo_new(struct drm_device *dev, struct nouveau_channel *chan,
 	if (!nvbo->mappable && (flags & TTM_PL_FLAG_VRAM))
 		flags |= TTM_PL_FLAG_PRIV0;
 
+	/* Some of the tile_flags have a periodic structure of 24*4096 bytes, 
+	 * align to to that as well as the page size. Overallocate memory to 
+	 * avoid corruption of other buffer objects.
+	 */
+	switch (tile_flags) {
+		case 0x1800:
+		case 0x2800:
+		case 0x4800:
+		case 0x7a00:
+			size += 6*4096;
+			align = 2*24*4096;
+			break;
+		default:
+			break;
+	}
+
 	align >>= PAGE_SHIFT;
 
 	size = (size + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1);

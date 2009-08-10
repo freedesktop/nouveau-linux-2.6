@@ -277,9 +277,6 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	return 0;
 }
 
-extern struct drm_ioctl_desc nouveau_ioctls[];
-extern int nouveau_max_ioctl;
-
 static struct drm_driver driver = {
 	.driver_features =
 		DRIVER_USE_AGP | DRIVER_PCI_DMA | DRIVER_SG |
@@ -337,12 +334,18 @@ static int __init nouveau_init(void)
 {
 	driver.num_ioctls = nouveau_max_ioctl;
 
-	if (nouveau_modeset == -1)
-#if defined(CONFIG_DRM_NOUVEAU_KMS)
-		nouveau_modeset = 1;
-#else
-		nouveau_modeset = 0;
+	if (nouveau_modeset == -1) {
+#ifdef CONFIG_VGA_CONSOLE
+		if (vgacon_text_force())
+			nouveau_modeset = 0;
+		else
 #endif
+#if defined(CONFIG_DRM_NOUVEAU_KMS)
+			nouveau_modeset = 1;
+#else
+			nouveau_modeset = 0;
+#endif
+	}
 
 	if (nouveau_modeset == 1)
 		driver.driver_features |= DRIVER_MODESET;
