@@ -32,6 +32,7 @@
 #include "nv50_display.h"
 
 #include "drm_pciids.h"
+#include "drm_compat.h"
 
 MODULE_PARM_DESC(noagp, "Disable AGP");
 int nouveau_noagp = 0;
@@ -335,7 +336,7 @@ static int __init nouveau_init(void)
 	driver.num_ioctls = nouveau_max_ioctl;
 
 	if (nouveau_modeset == -1) {
-#ifdef CONFIG_VGA_CONSOLE
+#if defined(CONFIG_VGA_CONSOLE) && (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,28))
 		if (vgacon_text_force())
 			nouveau_modeset = 0;
 		else
