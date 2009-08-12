@@ -69,7 +69,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.load_context	= nv04_graph_load_context;
 		engine->graph.save_context	= nv04_graph_save_context;
 		engine->fifo.channels	= 16;
-		engine->fifo.init	= nouveau_fifo_init;
+		engine->fifo.init	= nv04_fifo_init;
 		engine->fifo.takedown	= nouveau_stub_takedown;
 		engine->fifo.channel_id		= nv04_fifo_channel_id;
 		engine->fifo.create_context	= nv04_fifo_create_context;
@@ -104,7 +104,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.load_context	= nv10_graph_load_context;
 		engine->graph.save_context	= nv10_graph_save_context;
 		engine->fifo.channels	= 32;
-		engine->fifo.init	= nouveau_fifo_init;
+		engine->fifo.init	= nv04_fifo_init;
 		engine->fifo.takedown	= nouveau_stub_takedown;
 		engine->fifo.channel_id		= nv10_fifo_channel_id;
 		engine->fifo.create_context	= nv10_fifo_create_context;
@@ -139,7 +139,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.load_context	= nv20_graph_load_context;
 		engine->graph.save_context	= nv20_graph_save_context;
 		engine->fifo.channels	= 32;
-		engine->fifo.init	= nouveau_fifo_init;
+		engine->fifo.init	= nv04_fifo_init;
 		engine->fifo.takedown	= nouveau_stub_takedown;
 		engine->fifo.channel_id		= nv10_fifo_channel_id;
 		engine->fifo.create_context	= nv10_fifo_create_context;
@@ -174,7 +174,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.load_context	= nv20_graph_load_context;
 		engine->graph.save_context	= nv20_graph_save_context;
 		engine->fifo.channels	= 32;
-		engine->fifo.init	= nouveau_fifo_init;
+		engine->fifo.init	= nv04_fifo_init;
 		engine->fifo.takedown	= nouveau_stub_takedown;
 		engine->fifo.channel_id		= nv10_fifo_channel_id;
 		engine->fifo.create_context	= nv10_fifo_create_context;
@@ -345,8 +345,9 @@ nouveau_card_init(struct drm_device *dev)
 
 	/* what about PVIDEO/PCRTC/PRAMDAC etc? */
 
-	ret = nouveau_fifo_alloc(dev, &dev_priv->channel, (struct drm_file *)-2,
-				 NvDmaFB, NvDmaTT);
+	ret = nouveau_channel_alloc(dev, &dev_priv->channel,
+				    (struct drm_file *)-2,
+				    NvDmaFB, NvDmaTT);
 	if (ret) return ret;
 
 	gpuobj = NULL;
@@ -411,7 +412,7 @@ static void nouveau_card_takedown(struct drm_device *dev)
 		nouveau_backlight_exit(dev);
 
 		if (dev_priv->channel) {
-			nouveau_fifo_free(dev_priv->channel);
+			nouveau_channel_free(dev_priv->channel);
 			dev_priv->channel = NULL;
 		}
 
@@ -444,7 +445,7 @@ static void nouveau_card_takedown(struct drm_device *dev)
  * file_priv */
 void nouveau_preclose(struct drm_device *dev, struct drm_file *file_priv)
 {
-	nouveau_fifo_cleanup(dev, file_priv);
+	nouveau_channel_cleanup(dev, file_priv);
 }
 
 /* first module load, setup the mmio/fb mapping */
