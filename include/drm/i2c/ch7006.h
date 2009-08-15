@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Maarten Maathuis.
+ * Copyright (C) 2009 Francisco Jerez.
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -24,39 +24,63 @@
  *
  */
 
-#ifndef __NOUVEAU_OUTPUT_H__
-#define __NOUVEAU_OUTPUT_H__
+#ifndef __DRM_I2C_CH7006_H__
+#define __DRM_I2C_CH7006_H__
 
-#include "drm_encoder_slave.h"
-#include "nouveau_drv.h"
+/**
+ * struct ch7006_encoder_params
+ *
+ * Describes how the ch7006 is wired up with the GPU. It should be
+ * used as the @params parameter of its @set_config method.
+ *
+ * See "http://www.chrontel.com/pdf/7006.pdf" for their precise
+ * meaning.
+ */
+struct ch7006_encoder_params {
+	enum {
+		CH7006_FORMAT_RGB16 = 0,
+		CH7006_FORMAT_YCrCb24m16,
+		CH7006_FORMAT_RGB24m16,
+		CH7006_FORMAT_RGB15,
+		CH7006_FORMAT_RGB24m12C,
+		CH7006_FORMAT_RGB24m12I,
+		CH7006_FORMAT_RGB24m8,
+		CH7006_FORMAT_RGB16m8,
+		CH7006_FORMAT_RGB15m8,
+		CH7006_FORMAT_YCrCb24m8,
+	} input_format;
 
-#define NV_DPMS_CLEARED 0x80
+	enum {
+		CH7006_CLOCK_SLAVE = 0,
+		CH7006_CLOCK_MASTER,
+	} clock_mode;
 
-struct nouveau_encoder {
-	struct drm_encoder_slave base;
+	enum {
+		CH7006_CLOCK_EDGE_NEG = 0,
+		CH7006_CLOCK_EDGE_POS,
+	} clock_edge;
 
-	struct dcb_entry *dcb;
-	int or;
+	int xcm, pcm;
 
-	struct drm_display_mode mode;
-	int last_dpms;
+	enum {
+		CH7006_SYNC_SLAVE = 0,
+		CH7006_SYNC_MASTER,
+	} sync_direction;
 
-	struct nv04_output_reg restore;
+	enum {
+		CH7006_SYNC_SEPARATED = 0,
+		CH7006_SYNC_EMBEDDED,
+	} sync_encoding;
+
+	enum {
+		CH7006_POUT_1_8V = 0,
+		CH7006_POUT_3_3V,
+	} pout_level;
+
+	enum {
+		CH7006_ACTIVE_HSYNC = 0,
+		CH7006_ACTIVE_DSTART,
+	} active_detect;
 };
 
-static inline struct nouveau_encoder *nouveau_encoder(struct drm_encoder *enc)
-{
-	struct drm_encoder_slave *slave = to_encoder_slave(enc);
-
-	return container_of(slave, struct nouveau_encoder, base);
-}
-
-static inline struct drm_encoder *to_drm_encoder(struct nouveau_encoder *enc)
-{
-	return &enc->base.base;
-}
-
-int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry);
-int nv50_dac_create(struct drm_device *dev, struct dcb_entry *entry);
-
-#endif /* __NOUVEAU_OUTPUT_H__ */
+#endif

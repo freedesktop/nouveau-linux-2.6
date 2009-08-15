@@ -37,7 +37,7 @@
 static void
 nv50_sor_disconnect(struct nouveau_encoder *encoder)
 {
-	struct drm_device *dev = encoder->base.dev;
+	struct drm_device *dev = to_drm_encoder(encoder)->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_channel *evo = dev_priv->evo;
 	int ret;
@@ -103,20 +103,6 @@ static void nv50_sor_restore(struct drm_encoder *drm_encoder)
 	NV_ERROR(drm_encoder->dev, "!!\n");
 }
 
-struct nouveau_connector *
-nouveau_encoder_connector_get(struct nouveau_encoder *encoder)
-{
-	struct drm_device *dev = encoder->base.dev;
-	struct drm_connector *drm_connector;
-
-	list_for_each_entry(drm_connector, &dev->mode_config.connector_list, head) {
-		if (drm_connector->encoder == &encoder->base)
-			return nouveau_connector(drm_connector);
-	}
-
-	return NULL;
-}
-
 static bool nv50_sor_mode_fixup(struct drm_encoder *drm_encoder,
 				struct drm_display_mode *mode,
 				struct drm_display_mode *adjusted_mode)
@@ -166,7 +152,7 @@ static void nv50_sor_mode_set(struct drm_encoder *drm_encoder,
 	nv50_sor_dpms(drm_encoder, DRM_MODE_DPMS_ON);
 	dev_priv->in_modeset = ret;
 
-	if (encoder->base.encoder_type != DRM_MODE_ENCODER_LVDS) {
+	if (to_drm_encoder(encoder)->encoder_type != DRM_MODE_ENCODER_LVDS) {
 		mode_ctl |= NV50_EVO_SOR_MODE_CTRL_TMDS;
 		if (adjusted_mode->clock > 165000)
 			mode_ctl |= NV50_EVO_SOR_MODE_CTRL_TMDS_DUAL_LINK;
@@ -212,7 +198,7 @@ static void nv50_sor_destroy(struct drm_encoder *drm_encoder)
 	if (!drm_encoder)
 		return;
 
-	drm_encoder_cleanup(&encoder->base);
+	drm_encoder_cleanup(to_drm_encoder(encoder));
 
 	kfree(encoder);
 }
@@ -254,11 +240,11 @@ int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry)
 	encoder->dcb = entry;
 	encoder->or = ffs(entry->or) - 1;
 
-	drm_encoder_init(dev, &encoder->base, &nv50_sor_encoder_funcs, type);
-	drm_encoder_helper_add(&encoder->base, &nv50_sor_helper_funcs);
+	drm_encoder_init(dev, to_drm_encoder(encoder), &nv50_sor_encoder_funcs, type);
+	drm_encoder_helper_add(to_drm_encoder(encoder), &nv50_sor_helper_funcs);
 
-	encoder->base.possible_crtcs = entry->heads;
-	encoder->base.possible_clones = 0;
+	to_drm_encoder(encoder)->possible_crtcs = entry->heads;
+	to_drm_encoder(encoder)->possible_clones = 0;
 
 	return 0;
 }

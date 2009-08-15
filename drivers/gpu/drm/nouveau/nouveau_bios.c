@@ -33,6 +33,7 @@
 #define FEATURE_MOBILE 0x10	/* also FEATURE_QUADRO for BMP */
 #define LEGACY_I2C_CRT 0x80
 #define LEGACY_I2C_PANEL 0x81
+#define LEGACY_I2C_TV 0x82
 
 #define EDID1_LEN 128
 
@@ -2698,30 +2699,6 @@ static void parse_init_tables(struct drm_device *dev, struct nvbios *bios)
 	}
 }
 
-static void link_head_and_output(struct drm_device *dev, struct dcb_entry *dcbent, int head, bool dl)
-{
-	/* The BIOS scripts don't do this for us, sadly
-	 * Luckily we do know the values ;-)
-	 *
-	 * head < 0 indicates we wish to force a setting with the overrideval
-	 * (for VT restore etc.)
-	 */
-
-	int ramdac = (dcbent->or & OUTPUT_C) >> 2;
-	uint8_t tmds04 = 0x80;
-
-	if (head != ramdac)
-		tmds04 = 0x88;
-
-	if (dcbent->type == OUTPUT_LVDS)
-		tmds04 |= 0x01;
-
-	nv_write_tmds(dev, dcbent->or, 0, 0x04, tmds04);
-
-	if (dl)	/* dual link */
-		nv_write_tmds(dev, dcbent->or, 1, 0x04, tmds04 ^ 0x08);
-}
-
 static uint16_t clkcmptable(struct nvbios *bios, uint16_t clktable, int pxclk)
 {
 	int compare_record_len, i = 0;
@@ -2762,7 +2739,7 @@ static void run_digital_op_script(struct drm_device *dev, uint16_t scriptptr, st
 	NVWriteVgaCrtc5758(dev, head, 0, dcbent->index);
 	parse_init_table(dev, bios, scriptptr, &iexec);
 
-	link_head_and_output(dev, dcbent, head, dl);
+	nv04_dfp_bind_head(dev, dcbent, head, dl);
 }
 
 static int call_lvds_manufacturer_script(struct drm_device *dev, struct dcb_entry *dcbent, int head, enum LVDS_script script)
@@ -3984,8 +3961,8 @@ static int parse_bit_i_tbl_entry(struct drm_device *dev, struct nvbios *bios, st
 	if (!daccmpoffset)
 		return 0;
 
-	/* The first value in the table, following the header, is the comparison value
-	 * Purpose of subsequent values unknown -- TV load detection?
+	/* The first value in the table, following the header, is the comparison value,
+	 * the second entry is a comparison value for TV load detection.
 	 */
 
 	dacver = bios->data[daccmpoffset];
@@ -3998,6 +3975,7 @@ static int parse_bit_i_tbl_entry(struct drm_device *dev, struct nvbios *bios, st
 	}
 
 	bios->pub.dactestval = ROM32(bios->data[daccmpoffset + dacheaderlen]);
+	bios->pub.tvdactestval = ROM32(bios->data[daccmpoffset + dacheaderlen + 4]);
 
 	return 0;
 }
@@ -4520,6 +4498,16 @@ static void fabricate_dvi_i_output(struct parsed_dcb *dcb, bool twoHeads)
 #endif
 }
 
+static void fabricate_tv_output(struct parsed_dcb *dcb, bool twoHeads)
+{
+	struct dcb_entry *entry = new_dcb_entry(dcb);
+
+	entry->type = 1;
+	entry->i2c_index = LEGACY_I2C_TV;
+	entry->heads = twoHeads ? 3 : 1;
+	entry->location = !DCB_LOC_ON_CHIP;	/* ie OFF CHIP */
+}
+
 static bool
 parse_dcb20_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb,
 		  uint32_t conn, uint32_t conf, struct dcb_entry *entry)
@@ -4585,6 +4573,15 @@ parse_dcb20_entry(struct drm_device *dev, struct bios_parsed_dcb *bdcb,
 		}
 		break;
 		}
+	case OUTPUT_TV:
+	{
+		if (bdcb->version >= 0x30)
+			entry->tvconf.has_component_output = conf & (0x8 << 4);
+		else
+			entry->tvconf.has_component_output = false;
+
+		break;
+	}
 	case 0xe:
 		/* weird g80 mobile type that "nv" treats as a terminator */
 		bdcb->dcb.entries--;
@@ -4650,6 +4647,10 @@ parse_dcb15_entry(struct drm_device *dev, struct parsed_dcb *dcb,
 		/* invent a DVI-A output, by copying the fields of the DVI-D
 		 * output; reported to work by math_b on an NV20(!) */
 		fabricate_vga_output(dcb, entry->i2c_index, entry->heads);
+		break;
+	case OUTPUT_TV:
+		entry->tvconf.has_component_output = false;
+		break;
 	}
 
 	return true;
@@ -4743,6 +4744,11 @@ static int parse_dcb_table(struct drm_device *dev, struct nvbios *bios, bool two
 			       "assuming a CRT output exists\n");
 		/* this situation likely means a really old card, pre DCB */
 		fabricate_vga_output(dcb, LEGACY_I2C_CRT, 1);
+
+		if (nv04_tv_identify(dev,
+				     bios->legacy.i2c_indices.tv) >= 0)
+			fabricate_tv_output(dcb, twoHeads);
+
 		return 0;
 	}
 
@@ -4803,9 +4809,19 @@ static int parse_dcb_table(struct drm_device *dev, struct nvbios *bios, bool two
 		NV_TRACEWARN(dev, "No useful information in BIOS output table; "
 				  "adding all possible outputs\n");
 		fabricate_vga_output(dcb, LEGACY_I2C_CRT, 1);
-		if (bios->tmds.output0_script_ptr ||
-		    bios->tmds.output1_script_ptr)
+
+		/* Attempt to detect TV before DVI because the test
+		 * for the former is more accurate and it rules the
+		 * latter out.
+		 */
+		if (nv04_tv_identify(dev,
+				     bios->legacy.i2c_indices.tv) >= 0)
+			fabricate_tv_output(dcb, twoHeads);
+
+		else if (bios->tmds.output0_script_ptr ||
+			 bios->tmds.output1_script_ptr)
 			fabricate_dvi_i_output(dcb, twoHeads);
+
 		return 0;
 	}
 
@@ -4859,6 +4875,8 @@ static void fixup_legacy_i2c(struct nvbios *bios)
 			dcb->entry[i].i2c_index = bios->legacy.i2c_indices.crt;
 		if (dcb->entry[i].i2c_index == LEGACY_I2C_PANEL)
 			dcb->entry[i].i2c_index = bios->legacy.i2c_indices.panel;
+		if (dcb->entry[i].i2c_index == LEGACY_I2C_TV)
+			dcb->entry[i].i2c_index = bios->legacy.i2c_indices.tv;
 	}
 }
 
@@ -5038,6 +5056,8 @@ nouveau_bios_init(struct drm_device *dev)
 	uint32_t saved_nv_pextdev_boot_0;
 	int ret;
 
+	dev_priv->vbios = &bios->pub;
+
 	if (!NVInitVBIOS(dev))
 		return -ENODEV;
 
@@ -5072,8 +5092,6 @@ nouveau_bios_init(struct drm_device *dev)
 	}
 
 	bios_wr32(dev, NV_PEXTDEV_BOOT_0, saved_nv_pextdev_boot_0);
-
-	dev_priv->vbios = &bios->pub;
 
 	ret = nouveau_run_vbios_init(dev);
 	if (ret) {
