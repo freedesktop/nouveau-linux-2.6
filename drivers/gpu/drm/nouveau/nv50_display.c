@@ -472,6 +472,7 @@ int nv50_display_create(struct drm_device *dev)
 		switch (entry->type) {
 		case OUTPUT_TMDS:
 		case OUTPUT_LVDS:
+		case OUTPUT_DP:
 			nv50_sor_create(dev, entry);
 			break;
 		case OUTPUT_ANALOG:
@@ -496,12 +497,13 @@ int nv50_display_create(struct drm_device *dev)
 		int type;
 
 		encoders = connector[entry->connector];
+		if (!(encoders & (1 << entry->type)))
+			continue;
 		connector[entry->connector] = 0;
 
-		/* already done? */
-		if (!encoders)
-			continue;
-
+		if (encoders & (1 << OUTPUT_DP)) {
+			type = DRM_MODE_CONNECTOR_DisplayPort;
+		} else
 		if (encoders & (1 << OUTPUT_TMDS)) {
 			if (encoders & (1 << OUTPUT_ANALOG))
 				type = DRM_MODE_CONNECTOR_DVII;

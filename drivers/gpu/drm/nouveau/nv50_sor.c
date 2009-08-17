@@ -114,8 +114,7 @@ static bool nv50_sor_mode_fixup(struct drm_encoder *drm_encoder,
 	if (!connector)
 		return false;
 
-	if ((connector->scaling_mode != DRM_MODE_SCALE_NON_GPU &&
-	     connector->scaling_mode != DRM_MODE_SCALE_NO_SCALE) &&
+	if (connector->scaling_mode != DRM_MODE_SCALE_NON_GPU &&
 	     connector->native_mode) {
 		int id = adjusted_mode->base.id;
 		*adjusted_mode = *connector->native_mode;
@@ -228,6 +227,10 @@ int nv50_sor_create(struct drm_device *dev, struct dcb_entry *entry)
 			NV_ERROR(dev, "Failed parsing LVDS table\n");
 			return -EINVAL;
 		}
+		break;
+	case OUTPUT_DP:
+		NV_INFO(dev, "Detected a DP output\n");
+		type = DRM_MODE_ENCODER_TMDS;
 		break;
 	default:
 		return -EINVAL;

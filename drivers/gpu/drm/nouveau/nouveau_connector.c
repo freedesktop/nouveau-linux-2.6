@@ -91,8 +91,6 @@ nouveau_connector_destroy(struct drm_connector *drm_connector)
 	if (!connector)
 		return;
 
-	nouveau_i2c_del(&connector->i2c_chan);
-
 	drm_sysfs_connector_remove(drm_connector);
 	drm_connector_cleanup(drm_connector);
 	kfree(drm_connector);
@@ -130,14 +128,14 @@ nouveau_connector_ddc_finish(struct drm_connector *connector, int flags)
 		NVLockVgaCrtcs(dev_priv->dev, true);
 }
 
-static bool
-nouveau_connector_ddc_detect(struct drm_connector *connector)
+static struct nouveau_i2c_chan *
+nouveau_connector_ddc_detect(struct drm_connector *connector,
+			     struct nouveau_encoder **pnv_encoder)
 {
-	struct nouveau_connector *nv_connector = nouveau_connector(connector);
-	/* kindly borrrowed from the intel driver, hope it works. */
-	uint8_t out_buf[] = { 0x0, 0x0};
-	uint8_t buf[2];
-	int ret, flags;
+	struct drm_device *dev = connector->dev;
+	uint8_t out_buf[] = { 0x0, 0x0}, buf[2];
+	int ret, flags, i;
+
 	struct i2c_msg msgs[] = {
 		{
 			.addr = 0x50,
@@ -153,15 +151,37 @@ nouveau_connector_ddc_detect(struct drm_connector *connector)
 		}
 	};
 
-	if (!nv_connector->i2c_chan)
-		return false;
+	for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
+		struct nouveau_i2c_chan *i2c = NULL;
+		struct nouveau_encoder *nv_encoder;
+		struct drm_mode_object *obj;
+		int id;
 
-	nouveau_connector_ddc_prepare(connector, &flags);
-	ret = i2c_transfer(&nv_connector->i2c_chan->adapter, msgs, 2);
-	nouveau_connector_ddc_finish(connector, flags);
-	if (ret == 2)
-		return true;
-	return false;
+		id = connector->encoder_ids[i];
+		if (!id)
+			break;
+
+		obj = drm_mode_object_find(dev, id, DRM_MODE_OBJECT_ENCODER);
+		if (!obj)
+			continue;
+		nv_encoder = nouveau_encoder(obj_to_encoder(obj));
+
+		if (nv_encoder->dcb->i2c_index < 0xf)
+			i2c = nouveau_i2c_find(dev, nv_encoder->dcb->i2c_index);
+		if (!i2c)
+			continue;
+
+		nouveau_connector_ddc_prepare(connector, &flags);
+		ret = i2c_transfer(&i2c->adapter, msgs, 2);
+		nouveau_connector_ddc_finish(connector, flags);
+
+		if (ret == 2) {
+			*pnv_encoder = nv_encoder;
+			return i2c;
+		}
+	}
+
+	return NULL;
 }
 
 static void
@@ -191,6 +211,14 @@ nouveau_connector_set_encoder(struct drm_connector *connector,
 		else
 			connector->interlace_allowed = true;
 	}
+
+	if (connector->connector_type == DRM_MODE_CONNECTOR_DVII) {
+		drm_connector_property_set_value(connector,
+			dev->mode_config.dvi_i_subconnector_property,
+			nv_encoder->dcb->type == OUTPUT_TMDS ?
+			DRM_MODE_SUBCONNECTOR_DVID :
+			DRM_MODE_SUBCONNECTOR_DVIA);
+	}
 }
 
 static enum drm_connector_status
@@ -199,39 +227,46 @@ nouveau_connector_detect(struct drm_connector *connector)
 	struct drm_device *dev = connector->dev;
 	struct nouveau_connector *nv_connector = nouveau_connector(connector);
 	struct nouveau_encoder *nv_encoder = NULL;
+	struct nouveau_i2c_chan *i2c;
 	int type, flags;
 
-	if ((nv_encoder = find_encoder_by_type(connector, OUTPUT_LVDS))
-	    && nv_connector->native_mode) {
-
+	nv_encoder = find_encoder_by_type(connector, OUTPUT_LVDS);
+	if (nv_encoder && nv_connector->native_mode) {
 		nouveau_connector_set_encoder(connector, nv_encoder);
 		return connector_status_connected;
 	}
 
-	if (nouveau_connector_ddc_detect(connector)) {
+	i2c = nouveau_connector_ddc_detect(connector, &nv_encoder);
+	if (i2c) {
 		nouveau_connector_ddc_prepare(connector, &flags);
-		nv_connector->edid =
-			drm_get_edid(connector, &nv_connector->i2c_chan->adapter);
+		nv_connector->edid = drm_get_edid(connector, &i2c->adapter);
 		nouveau_connector_ddc_finish(connector, flags);
-		drm_mode_connector_update_edid_property(connector, nv_connector->edid);
+		drm_mode_connector_update_edid_property(connector,
+							nv_connector->edid);
 		if (!nv_connector->edid) {
 			NV_ERROR(dev, "DDC responded, but no EDID for %s\n",
 				 drm_get_connector_name(connector));
 			return connector_status_disconnected;
 		}
 
-		if (connector->connector_type == DRM_MODE_CONNECTOR_LVDS)
-			type = OUTPUT_LVDS;
-		else if (nv_connector->edid->input & DRM_EDID_INPUT_DIGITAL)
-			type = OUTPUT_TMDS;
-		else
-			type = OUTPUT_ANALOG;
+		/* Override encoder type for DVI-I based on whether EDID
+		 * says the display is digital or analog, both use the
+		 * same i2c channel so the value returned from ddc_detect
+		 * isn't necessarily correct.
+		 */
+		if (connector->connector_type == DRM_MODE_CONNECTOR_DVII) {
+			if (nv_connector->edid->input & DRM_EDID_INPUT_DIGITAL)
+				type = OUTPUT_TMDS;
+			else
+				type = OUTPUT_ANALOG;
 
-		nv_encoder = find_encoder_by_type(connector, type);
-		if (!nv_encoder) {
-			NV_ERROR(dev, "Detected %d encoder on %s, but no object!\n",
-				 type, drm_get_connector_name(connector));
-			return connector_status_disconnected;
+			nv_encoder = find_encoder_by_type(connector, type);
+			if (!nv_encoder) {
+				NV_ERROR(dev, "Detected %d encoder on %s, "
+					      "but no object!\n", type,
+					 drm_get_connector_name(connector));
+				return connector_status_disconnected;
+			}
 		}
 
 		nouveau_connector_set_encoder(connector, nv_encoder);
@@ -529,6 +564,9 @@ nouveau_connector_create(struct drm_device *dev, int i2c_index, int type)
 	case DRM_MODE_CONNECTOR_TV:
 		NV_INFO(dev, "Detected a TV connector\n");
 		break;
+	case DRM_MODE_CONNECTOR_DisplayPort:
+		NV_INFO(dev, "Detected a DisplayPort connector\n");
+		break;
 	default:
 		NV_ERROR(dev, "Unknown connector, this is not good.\n");
 		break;
@@ -540,15 +578,6 @@ nouveau_connector_create(struct drm_device *dev, int i2c_index, int type)
 
 	drm_connector_init(dev, connector, &nouveau_connector_funcs, type);
 	drm_connector_helper_add(connector, &nouveau_connector_helper_funcs);
-
-	if (i2c_index < 0xf) {
-		ret = nouveau_i2c_new(dev, drm_get_connector_name(connector),
-				      i2c_index, &nv_connector->i2c_chan);
-		if (ret) {
-			NV_ERROR(dev, "Error initialising I2C on %s: %d\n",
-				 drm_get_connector_name(connector), ret);
-		}
-	}
 
 	/* Init DVI-I specific properties */
 	if (type == DRM_MODE_CONNECTOR_DVII) {
@@ -562,7 +591,8 @@ nouveau_connector_create(struct drm_device *dev, int i2c_index, int type)
 
 	if (type == DRM_MODE_CONNECTOR_DVID ||
 	    type == DRM_MODE_CONNECTOR_DVII ||
-	    type == DRM_MODE_CONNECTOR_LVDS) {
+	    type == DRM_MODE_CONNECTOR_LVDS ||
+	    type == DRM_MODE_CONNECTOR_DisplayPort) {
 		nv_connector->scaling_mode = DRM_MODE_SCALE_FULLSCREEN;
 
 		drm_connector_attach_property(connector, dev->mode_config.scaling_mode_property,
