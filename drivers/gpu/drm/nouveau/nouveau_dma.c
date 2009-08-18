@@ -56,15 +56,12 @@ nouveau_dma_init(struct nouveau_channel *chan)
 	ret = nouveau_bo_map(chan->pushbuf_bo);
 	if (ret)
 		return ret;
-	chan->dma.pushbuf = chan->pushbuf_bo->kmap.virtual;
 
 	/* Map M2MF notifier object - fbcon. */
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
 		ret = nouveau_bo_map(chan->notifier_bo);
 		if (ret)
 			return ret;
-		chan->m2mf_ntfy_map  = chan->notifier_bo->kmap.virtual;
-		chan->m2mf_ntfy_map += chan->m2mf_ntfy;
 	}
 
 	/* Initialise DMA vars */
@@ -89,6 +86,19 @@ nouveau_dma_init(struct nouveau_channel *chan)
 	FIRE_RING (chan);
 
 	return 0;
+}
+
+void
+OUT_RINGp(struct nouveau_channel *chan, const void *data, unsigned nr_dwords)
+{
+	bool is_iomem;
+	u32 *mem = ttm_kmap_obj_virtual(&chan->pushbuf_bo->kmap, &is_iomem);
+	mem = &mem[chan->dma.cur];
+	if (is_iomem)
+		memcpy_toio((void __force __iomem *)mem, data, nr_dwords * 4);
+	else
+		memcpy(mem, data, nr_dwords * 4);
+	chan->dma.cur += nr_dwords;
 }
 
 static inline bool

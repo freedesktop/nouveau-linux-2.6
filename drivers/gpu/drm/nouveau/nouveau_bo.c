@@ -39,8 +39,7 @@ nouveau_bo_del_ttm(struct ttm_buffer_object *bo)
 	struct drm_nouveau_private *dev_priv = nouveau_bdev(bo->bdev);
 	struct nouveau_bo *nvbo = nouveau_bo(bo);
 
-	if (unlikely(nvbo->kmap.virtual))
-		ttm_bo_kunmap(&nvbo->kmap);
+	ttm_bo_kunmap(&nvbo->kmap);
 
 	if (unlikely(nvbo->gem))
 		DRM_ERROR("bo %p still attached to GEM object\n", bo);
@@ -188,6 +187,29 @@ nouveau_bo_unmap(struct nouveau_bo *nvbo)
 	ttm_bo_kunmap(&nvbo->kmap);
 }
 
+u32
+nouveau_bo_rd32(struct nouveau_bo *nvbo, unsigned index)
+{
+	bool is_iomem;
+	u32 *mem = ttm_kmap_obj_virtual(&nvbo->kmap, &is_iomem);
+	mem = &mem[index];
+	if (is_iomem)
+		return ioread32_native((void __force __iomem *)mem);
+	else
+		return *mem;
+}
+
+void
+nouveau_bo_wr32(struct nouveau_bo *nvbo, unsigned index, u32 val)
+{
+	bool is_iomem;
+	u32 *mem = ttm_kmap_obj_virtual(&nvbo->kmap, &is_iomem);
+	mem = &mem[index];
+	if (is_iomem)
+		iowrite32_native(val, (void __force __iomem *)mem);
+	else
+		*mem = val;
+}
 static struct ttm_backend *
 nouveau_bo_create_ttm_backend_entry(struct ttm_bo_device *bdev)
 {

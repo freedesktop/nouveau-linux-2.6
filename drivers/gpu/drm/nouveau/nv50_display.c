@@ -328,7 +328,6 @@ nv50_display_init(struct drm_device *dev)
 	evo->dma.put = 0;
 	evo->dma.cur = evo->dma.put;
 	evo->dma.free = evo->dma.max - evo->dma.cur;
-	evo->dma.pushbuf = evo->pushbuf_bo->kmap.virtual;
 
 	RING_SPACE(evo, NOUVEAU_DMA_SKIPS);
 	for (i = 0; i < NOUVEAU_DMA_SKIPS; i++)
@@ -641,14 +640,12 @@ nv50_display_vblank_crtc_handler(struct drm_device *dev, int crtc)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_channel *chan;
 	struct list_head *entry, *tmp;
-	uint32_t *sem;
 
 	list_for_each_safe(entry, tmp, &dev_priv->vbl_waiting) {
 		chan = list_entry(entry, struct nouveau_channel, nvsw.vbl_wait);
 
-		sem = chan->notifier_bo->kmap.virtual;
-		sem[chan->nvsw.vblsem_offset] = chan->nvsw.vblsem_rval;
-
+		nouveau_bo_wr32(chan->notifier_bo, chan->nvsw.vblsem_offset,
+						chan->nvsw.vblsem_rval);
 		list_del(&chan->nvsw.vbl_wait);
 	}
 }

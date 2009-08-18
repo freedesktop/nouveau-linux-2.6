@@ -71,12 +71,13 @@ nouveau_fbcon_sync(struct fb_info *info)
 	OUT_RING  (chan, 0);
 	BEGIN_RING(chan, 0, 0x0100, 1);
 	OUT_RING  (chan, 0);
-	chan->m2mf_ntfy_map[3] = 0xffffffff;
+	nouveau_bo_wr32(chan->notifier_bo, chan->m2mf_ntfy + 3, 0xffffffff);
 	FIRE_RING (chan);
 
 	ret = -EBUSY;
 	for (i = 0; i < 100000; i++) {
-		if (chan->m2mf_ntfy_map[3] == 0) {
+		if (nouveau_bo_rd32(chan->notifier_bo, chan->m2mf_ntfy + 3)
+									== 0) {
 			ret = 0;
 			break;
 		}
@@ -587,7 +588,7 @@ static int nouveau_fbcon_create(struct drm_device *dev, uint32_t fb_width,
 	info->flags = FBINFO_DEFAULT | FBINFO_HWACCEL_COPYAREA |
 		      FBINFO_HWACCEL_FILLRECT | FBINFO_HWACCEL_IMAGEBLIT;
 
-	info->screen_base = nouveau_fb->nvbo->kmap.virtual;
+	info->screen_base = nvbo_kmap_obj_iovirtual(nouveau_fb->nvbo);
 	info->screen_size = size;
 
 	info->pseudo_palette = fb->pseudo_palette;

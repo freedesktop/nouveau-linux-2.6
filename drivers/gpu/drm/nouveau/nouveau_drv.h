@@ -95,6 +95,17 @@ nouveau_gem_object(struct drm_gem_object *gem)
 	return gem ? gem->driver_private : NULL;
 }
 
+/* TODO: submit equivalent to TTM generic API upstream? */
+static inline void __iomem *
+nvbo_kmap_obj_iovirtual(struct nouveau_bo *nvbo)
+{
+	bool is_iomem;
+	void __iomem *ioptr = (void __force __iomem *)ttm_kmap_obj_virtual(
+						&nvbo->kmap, &is_iomem);
+	WARN_ON_ONCE(ioptr && !is_iomem);
+	return ioptr;
+}
+
 struct mem_block {
 	struct mem_block *next;
 	struct mem_block *prev;
@@ -203,7 +214,6 @@ struct nouveau_channel
 
 	/* GPU object info for stuff used in-kernel (mm_enabled) */
 	uint32_t m2mf_ntfy;
-	volatile uint32_t *m2mf_ntfy_map;
 	uint32_t vram_handle;
 	uint32_t gart_handle;
 	bool accel_done;
@@ -214,8 +224,7 @@ struct nouveau_channel
 		int free;
 		int cur;
 		int put;
-
-		volatile uint32_t *pushbuf;
+		/* access via pushbuf_bo */
 	} dma;
 
 	uint32_t sw_subchannel[8];
@@ -958,6 +967,8 @@ extern int nouveau_bo_pin(struct nouveau_bo *, uint32_t flags);
 extern int nouveau_bo_unpin(struct nouveau_bo *);
 extern int nouveau_bo_map(struct nouveau_bo *);
 extern void nouveau_bo_unmap(struct nouveau_bo *);
+extern u32 nouveau_bo_rd32(struct nouveau_bo *nvbo, unsigned index);
+extern void nouveau_bo_wr32(struct nouveau_bo *nvbo, unsigned index, u32 val);
 
 /* nouveau_fence.c */
 struct nouveau_fence;
