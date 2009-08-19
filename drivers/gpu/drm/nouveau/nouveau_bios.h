@@ -151,6 +151,7 @@ struct nouveau_bios_info {
 };
 
 struct nvbios {
+	struct drm_device *dev;
 	struct nouveau_bios_info pub;
 
 	uint8_t data[NV_PROM_SIZE];
@@ -180,6 +181,12 @@ struct nvbios {
 	uint16_t init96_tbl_ptr; /* BIT I + 16 */
 
 	struct bios_parsed_dcb bdcb;
+
+	struct {
+		int crtchead;
+		/* these need remembering across suspend */
+		uint32_t saved_nv_pfb_cfg0;
+	} state;
 
 	struct {
 		int head;
