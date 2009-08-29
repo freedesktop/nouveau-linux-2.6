@@ -551,6 +551,25 @@ int nv50_display_destroy(struct drm_device *dev)
 	return 0;
 }
 
+static inline uint32_t
+nv50_display_mode_ctrl(struct drm_device *dev, bool sor, int or)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	uint32_t mc;
+
+	if (sor) {
+		if (dev_priv->chipset < 0x90 ||
+		    dev_priv->chipset == 0x92 || dev_priv->chipset == 0xa0)
+			mc = nv_rd32(dev, NV50_PDISPLAY_SOR_MODE_CTRL_P(or));
+		else
+			mc = nv_rd32(dev, NV90_PDISPLAY_SOR_MODE_CTRL_P(or));
+	} else {
+		mc = nv_rd32(dev, NV50_PDISPLAY_DAC_MODE_CTRL_P(or));
+	}
+
+	return mc;
+}
+
 static int
 nv50_display_irq_head(struct drm_device *dev, int *phead,
 		      struct dcb_entry **pdcbent)
@@ -578,21 +597,13 @@ nv50_display_irq_head(struct drm_device *dev, int *phead,
 	 * should be the case.
 	 */
 	for (i = 0; i < 3; i++) {
-		if (nv_rd32(dev, NV50_PDISPLAY_DAC_MODE_CTRL_P(i)) & (1 << head))
+		if (nv50_display_mode_ctrl(dev, false, i) & (1 << head))
 			dac |= (1 << i);
 	}
 
-	if (dev_priv->chipset < 0x90 || dev_priv->chipset == 0x92 ||
-	    dev_priv->chipset == 0xa0) {
-		for (i = 0; i < 4; i++) {
-			if (nv_rd32(dev, NV50_PDISPLAY_SOR_MODE_CTRL_P(i)) & (1 << head))
-				sor |= (1 << i);
-		}
-	} else {
-		for (i = 0; i < 4; i++) {
-			if (nv_rd32(dev, NV90_PDISPLAY_SOR_MODE_CTRL_P(i)) & (1 << head))
-				sor |= (1 << i);
-		}
+	for (i = 0; i < 4; i++) {
+		if (nv50_display_mode_ctrl(dev, true, i) & (1 << head))
+			sor |= (1 << i);
 	}
 
 	NV_DEBUG(dev, "dac: 0x%08x, sor: 0x%08x\n", dac, sor);
@@ -641,6 +652,52 @@ nv50_display_irq_head(struct drm_device *dev, int *phead,
 	return 0;
 }
 
+static uint32_t
+nv50_display_script_select(struct drm_device *dev, struct dcb_entry *dcbent,
+			   int pxclk)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	struct nvbios *bios = &dev_priv->VBIOS;
+	uint32_t mc, script = 0, or;
+
+	or = ffs(dcbent->or) - 1;
+	mc = nv50_display_mode_ctrl(dev, dcbent->type != OUTPUT_ANALOG, or);
+	switch (dcbent->type) {
+	case OUTPUT_LVDS:
+		script = (mc >> 8) & 0xf;
+		if (pxclk >= bios->fp.duallink_transition_clk)
+			script |= 0x0100;
+
+		if (nouveau_uscript_lvds >= 0) {
+			NV_INFO(dev, "override script 0x%04x with 0x%04x"
+				     "for output LVDS-%d\n", script,
+				     nouveau_uscript_lvds, or);
+			script = nouveau_uscript_lvds;
+		}
+		break;
+	case OUTPUT_TMDS:
+		script = (mc >> 8) & 0xf;
+		if (pxclk >= 165000)
+			script |= 0x0100;
+
+		if (nouveau_uscript_tmds >= 0) {
+			NV_INFO(dev, "override script 0x%04x with 0x%04x"
+				     "for output TMDS-%d\n", script,
+				     nouveau_uscript_tmds, or);
+			script = nouveau_uscript_tmds;
+		}
+		break;
+	case OUTPUT_ANALOG:
+		script = 0xff;
+		break;
+	default:
+		NV_ERROR(dev, "modeset on unsupported output type!\n");
+		break;
+	}
+
+	return script;
+}
+
 static void
 nv50_display_vblank_crtc_handler(struct drm_device *dev, int crtc)
 {
@@ -685,7 +742,7 @@ nv50_display_unk10_handler(struct drm_device *dev)
 
 	nv_wr32(dev, 0x619494, nv_rd32(dev, 0x619494) & ~8);
 
-	nouveau_bios_run_display_table(dev, dcbent, -1);
+	nouveau_bios_run_display_table(dev, dcbent, 0, -1);
 
 ack:
 	nv_wr32(dev, NV50_PDISPLAY_INTR_1, NV50_PDISPLAY_INTR_1_CLK_UNK10);
@@ -695,10 +752,8 @@ ack:
 static void
 nv50_display_unk20_handler(struct drm_device *dev)
 {
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nvbios *bios = &dev_priv->VBIOS;
 	struct dcb_entry *dcbent;
-	uint32_t tmp, pclk;
+	uint32_t tmp, pclk, script;
 	int head, or, ret;
 
 	ret = nv50_display_irq_head(dev, &head, &dcbent);
@@ -706,30 +761,24 @@ nv50_display_unk20_handler(struct drm_device *dev)
 		goto ack;
 	or = ffs(dcbent->or) - 1;
 	pclk = nv_rd32(dev, NV50_PDISPLAY_CRTC_P(head, CLOCK)) & 0x3fffff;
+	script = nv50_display_script_select(dev, dcbent, pclk);
 
 	NV_DEBUG(dev, "head %d pxclk: %dKHz\n", head, pclk);
 
-	nouveau_bios_run_display_table(dev, dcbent, -2);
+	nouveau_bios_run_display_table(dev, dcbent, 0, -2);
 
 	nv50_crtc_set_clock(dev, head, pclk);
 
-	nouveau_bios_run_display_table(dev, dcbent, pclk);
+	nouveau_bios_run_display_table(dev, dcbent, script, pclk);
 
 	tmp = nv_rd32(dev, NV50_PDISPLAY_CRTC_CLK_CTRL2(head));
 	tmp &= ~0x000000f;
 	nv_wr32(dev, NV50_PDISPLAY_CRTC_CLK_CTRL2(head), tmp);
 
 	if (dcbent->type != OUTPUT_ANALOG) {
-		int tclk;
-
-		if (dcbent->type == OUTPUT_LVDS)
-			tclk = bios->fp.duallink_transition_clk;
-		else
-			tclk = 165000;
-
 		tmp = nv_rd32(dev, NV50_PDISPLAY_SOR_CLK_CTRL2(or));
 		tmp &= ~0x00000f0f;
-		if (pclk > tclk)
+		if (script & 0x0100)
 			tmp |= 0x00000101;
 		nv_wr32(dev, NV50_PDISPLAY_SOR_CLK_CTRL2(or), tmp);
 	} else {
@@ -745,14 +794,15 @@ static void
 nv50_display_unk40_handler(struct drm_device *dev)
 {
 	struct dcb_entry *dcbent;
-	int head, pclk, ret;
+	int head, pclk, script, ret;
 
 	ret = nv50_display_irq_head(dev, &head, &dcbent);
 	if (ret)
 		goto ack;
 	pclk = nv_rd32(dev, NV50_PDISPLAY_CRTC_P(head, CLOCK)) & 0x3fffff;
+	script = nv50_display_script_select(dev, dcbent, pclk);
 
-	nouveau_bios_run_display_table(dev, dcbent, -pclk);
+	nouveau_bios_run_display_table(dev, dcbent, script, -pclk);
 
 ack:
 	nv_wr32(dev, NV50_PDISPLAY_INTR_1, NV50_PDISPLAY_INTR_1_CLK_UNK40);
