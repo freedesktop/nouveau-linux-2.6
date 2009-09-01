@@ -191,34 +191,19 @@ static int nv50_crtc_set_dither(struct nouveau_crtc *crtc, bool on, bool update)
 	return 0;
 }
 
-static struct nouveau_encoder *
-nouveau_crtc_encoder_get(struct nouveau_crtc *crtc)
-{
-	struct drm_device *dev = crtc->base.dev;
-	struct drm_encoder *drm_encoder;
-
-	list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
-		if (drm_encoder->crtc == &crtc->base)
-			return nouveau_encoder(drm_encoder);
-	}
-
-	return NULL;
-}
-
 struct nouveau_connector *
 nouveau_crtc_connector_get(struct nouveau_crtc *crtc)
 {
 	struct drm_device *dev = crtc->base.dev;
 	struct drm_connector *drm_connector;
-	struct nouveau_encoder *encoder;
+	struct drm_crtc *drm_crtc = to_drm_crtc(crtc);
 
-	encoder = nouveau_crtc_encoder_get(crtc);
-	if (!encoder)
-		return NULL;
-
+	/* The safest approach is to find an encoder with the right crtc, that
+	 * is also linked to a connector. */
 	list_for_each_entry(drm_connector, &dev->mode_config.connector_list, head) {
-		if (drm_connector->encoder == to_drm_encoder(encoder))
-			return nouveau_connector(drm_connector);
+		if (drm_connector->encoder)
+			if (drm_connector->encoder->crtc == drm_crtc)
+				return nouveau_connector(drm_connector);
 	}
 
 	return NULL;
@@ -370,6 +355,7 @@ static void nv50_crtc_destroy(struct drm_crtc *drm_crtc)
 	nv50_cursor_fini(crtc);
 
 	nouveau_bo_ref(NULL, &crtc->lut.nvbo);
+	nouveau_bo_ref(NULL, &crtc->cursor.nvbo);
 	kfree(crtc->mode);
 	kfree(crtc);
 }
@@ -390,6 +376,7 @@ nv50_crtc_cursor_set(struct drm_crtc *drm_crtc, struct drm_file *file_priv,
 		struct drm_nouveau_private *dev_priv = dev->dev_private;
 		struct drm_gem_object *gem;
 		struct nouveau_bo *nvbo;
+		int i;
 
 		gem = drm_gem_object_lookup(dev, file_priv, buffer_handle);
 		if (!gem)
@@ -401,23 +388,24 @@ nv50_crtc_cursor_set(struct drm_crtc *drm_crtc, struct drm_file *file_priv,
 		drm_gem_object_unreference(gem);
 		mutex_unlock(&dev->struct_mutex);
 
-		ret = nouveau_bo_pin(nvbo, TTM_PL_FLAG_VRAM);
+		ret = nouveau_bo_map(nvbo);
 		if (ret)
 			goto out;
 
-		crtc->cursor.offset = nvbo->bo.offset - dev_priv->vm_vram_base;
+		/* The simple will do for now. */
+		for (i = 0; i < 64*64; i++)
+			nouveau_bo_wr32(crtc->cursor.nvbo, i, nouveau_bo_rd32(nvbo, i));
+
+		nouveau_bo_unmap(nvbo);
+
+		crtc->cursor.offset = crtc->cursor.nvbo->bo.offset - dev_priv->vm_vram_base;
 		crtc->cursor.set_offset(crtc, crtc->cursor.offset);
 		crtc->cursor.show(crtc, true);
 	} else {
 		crtc->cursor.hide(crtc, true);
 	}
 
-	if (crtc->cursor.nvbo)
-		nouveau_bo_unpin(crtc->cursor.nvbo);
-	nouveau_bo_ref(cursor, &crtc->cursor.nvbo);
-
 out:
-	nouveau_bo_ref(NULL, &cursor);
 	return ret;
 }
 
@@ -459,18 +447,6 @@ nv50_crtc_gamma_set(struct drm_crtc *drm_crtc, u16 *r, u16 *g, u16 *b,
 	nv50_crtc_lut_load(crtc);
 }
 
-static int
-nv50_crtc_helper_set_config(struct drm_mode_set *set)
-{
-	struct drm_nouveau_private *dev_priv = set->crtc->dev->dev_private;
-	int ret;
-
-	dev_priv->in_modeset = true;
-	ret = drm_crtc_helper_set_config(set);
-	dev_priv->in_modeset = false;
-	return ret;
-}
-
 static void
 nv50_crtc_save(struct drm_crtc *crtc)
 {
@@ -489,32 +465,52 @@ static const struct drm_crtc_funcs nv50_crtc_funcs = {
 	.cursor_set = nv50_crtc_cursor_set,
 	.cursor_move = nv50_crtc_cursor_move,
 	.gamma_set = nv50_crtc_gamma_set,
-	.set_config = nv50_crtc_helper_set_config,
+	.set_config = drm_crtc_helper_set_config,
 	.destroy = nv50_crtc_destroy,
 };
 
 static void nv50_crtc_dpms(struct drm_crtc *drm_crtc, int mode)
 {
-	struct drm_nouveau_private *dev_priv = drm_crtc->dev->dev_private;
-	struct nouveau_crtc *crtc = nouveau_crtc(drm_crtc);
-
-	if (dev_priv->in_modeset)
-		nv50_crtc_blank(crtc, true);
 }
 
 static void nv50_crtc_prepare(struct drm_crtc *drm_crtc)
 {
+	struct drm_device *dev = drm_crtc->dev;
+	struct drm_encoder *drm_encoder;
+	struct nouveau_crtc *crtc = nouveau_crtc(drm_crtc);
+
+	NV_DEBUG(dev, "index %d\n", crtc->index);
+
+	/* Disconnect all unused encoders. */
+	list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
+		if (!drm_helper_encoder_in_use(drm_encoder)) {
+			struct nouveau_encoder *encoder =
+				nouveau_encoder(drm_encoder);
+			encoder->disconnect(encoder);
+		}
+	}
+
+	nv50_crtc_blank(crtc, true);
 }
 
 static void nv50_crtc_commit(struct drm_crtc *drm_crtc)
 {
+	struct drm_crtc *drm_crtc2;
 	struct drm_device *dev = drm_crtc->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_channel *evo = dev_priv->evo;
 	struct nouveau_crtc *crtc = nouveau_crtc(drm_crtc);
 	int ret;
 
+	NV_DEBUG(dev, "index %d\n", crtc->index);
+
 	nv50_crtc_blank(crtc, false);
+
+	/* Explicitly blank all unused crtc's. */
+	list_for_each_entry(drm_crtc2, &dev->mode_config.crtc_list, head) {
+		if (!drm_helper_crtc_in_use(drm_crtc2))
+			nv50_crtc_blank(nouveau_crtc(drm_crtc2), true);
+	}
 
 	ret = RING_SPACE(evo, 2);
 	if (ret) {
@@ -544,6 +540,8 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 	struct drm_framebuffer *drm_fb = crtc->base.fb;
 	struct nouveau_framebuffer *fb = nouveau_framebuffer(drm_fb);
 	int ret, format;
+
+	NV_DEBUG(dev, "index %d\n", crtc->index);
 
 	switch (drm_fb->depth) {
 	case  8: format = NV50_EVO_CRTC_FB_DEPTH_8; break;
@@ -633,31 +631,13 @@ nv50_crtc_mode_set(struct drm_crtc *drm_crtc, struct drm_display_mode *mode,
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_channel *evo = dev_priv->evo;
 	struct nouveau_crtc *crtc = nouveau_crtc(drm_crtc);
-	struct drm_encoder *drm_encoder;
-	struct nouveau_encoder *encoder;
 	struct nouveau_connector *connector = NULL;
 	uint32_t hsync_dur,  vsync_dur, hsync_start_to_end, vsync_start_to_end;
 	uint32_t hunk1, vunk1, vunk2a, vunk2b;
 	int ret;
 
 	/* Find the connector attached to this CRTC */
-	list_for_each_entry(drm_encoder, &dev->mode_config.encoder_list, head) {
-		struct drm_connector *drm_connector;
-
-		encoder = nouveau_encoder(drm_encoder);
-		if (drm_encoder->crtc != &crtc->base)
-			continue;
-
-		list_for_each_entry(drm_connector, &dev->mode_config.connector_list, head) {
-			connector = nouveau_connector(drm_connector);
-			if (drm_connector->encoder != drm_encoder)
-				continue;
-
-			break;
-		}
-
-		break; /* no use in finding more than one mode */
-	}
+	connector = nouveau_crtc_connector_get(crtc);
 
 	*crtc->mode = *adjusted_mode;
 
@@ -722,15 +702,13 @@ nv50_crtc_mode_set(struct drm_crtc *drm_crtc, struct drm_display_mode *mode,
 
 	/* This is the actual resolution of the mode. */
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, REAL_RES), 1);
-	OUT_RING  (evo, (crtc->base.mode.vdisplay << 16) |
-			 crtc->base.mode.hdisplay);
+	OUT_RING  (evo, (mode->vdisplay << 16) | mode->hdisplay);
 	BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, SCALE_CENTER_OFFSET), 1);
 	OUT_RING  (evo, NV50_EVO_CRTC_SCALE_CENTER_OFFSET_VAL(0, 0));
 
 	crtc->set_dither(crtc, connector->use_dithering, false);
 	crtc->set_scale(crtc, connector->scaling_mode, false);
 
-	FIRE_RING (evo);
 	return nv50_crtc_do_mode_set_base(drm_crtc, x, y, old_fb, false);
 }
 
@@ -805,6 +783,16 @@ nv50_crtc_create(struct drm_device *dev, int index)
 	drm_crtc_init(dev, &crtc->base, &nv50_crtc_funcs);
 	drm_crtc_helper_add(&crtc->base, &nv50_crtc_helper_funcs);
 	drm_mode_crtc_set_gamma_size(&crtc->base, 256);
+
+	ret = nouveau_bo_new(dev, NULL, 64*64*4, 0x100, TTM_PL_FLAG_VRAM,
+			     0, 0x0000, false, true, &crtc->cursor.nvbo);
+	if (!ret) {
+		ret = nouveau_bo_pin(crtc->cursor.nvbo, TTM_PL_FLAG_VRAM);
+		if (!ret)
+			ret = nouveau_bo_map(crtc->cursor.nvbo);
+		if (ret)
+			nouveau_bo_ref(NULL, &crtc->cursor.nvbo);
+	}
 
 	nv50_cursor_init(crtc);
 	return 0;

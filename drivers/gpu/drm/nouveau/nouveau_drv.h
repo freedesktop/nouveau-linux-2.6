@@ -486,8 +486,6 @@ struct drm_nouveau_private {
 		struct list_head bo_list;
 	} ttm;
 
-	struct fb_info *fbdev_info;
-
 	int fifo_alloc_count;
 	struct nouveau_channel *fifos[NOUVEAU_MAX_CHANNEL_NR];
 
@@ -546,8 +544,6 @@ struct drm_nouveau_private {
 	struct nouveau_gpuobj_ref *ctx_table;
 
 	struct list_head gpuobj_list;
-
-	bool in_modeset;
 
 	struct nvbios VBIOS;
 	struct nouveau_bios_info *vbios;
