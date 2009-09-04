@@ -29,6 +29,7 @@
 #include "drm_crtc_helper.h"
 #include "nouveau_drv.h"
 #include "nouveau_hw.h"
+#include "nouveau_fb.h"
 #include "nv50_display.h"
 
 #include "drm_pciids.h"
@@ -109,9 +110,8 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 	struct drm_device *dev = pci_get_drvdata(pdev);
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_engine *engine = &dev_priv->engine;
-	struct drm_framebuffer *fb = NULL;
-	struct fb_info *fb_info = NULL;
-	uint32_t fbdev_flags = 0;
+	struct drm_crtc *crtc;
+	uint32_t fbdev_flags;
 	int ret, i;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
@@ -120,14 +120,17 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 	if (pm_state.event == PM_EVENT_PRETHAW)
 		return 0;
 
-	if (!list_empty(&dev->mode_config.fb_kernel_list))
-		fb = list_first_entry(&dev->mode_config.fb_kernel_list,
-				      struct drm_framebuffer, filp_head);
+	fbdev_flags = dev_priv->fbdev_info->flags;
+	dev_priv->fbdev_info->flags |= FBINFO_HWACCEL_DISABLED;
 
-	if (fb) {
-		fb_info = fb->fbdev;
-		fbdev_flags = fb_info->flags;
-		fb_info->flags |= FBINFO_HWACCEL_DISABLED;
+	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+		struct nouveau_framebuffer *nouveau_fb;
+
+		nouveau_fb = nouveau_framebuffer(crtc->fb);
+		if (!nouveau_fb || !nouveau_fb->nvbo)
+			continue;
+
+		nouveau_bo_unpin(nouveau_fb->nvbo);
 	}
 
 	NV_INFO(dev, "Evicting buffers...\n");
@@ -195,11 +198,9 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 	}
 
 	acquire_console_sem();
-	if (fb_info)
-		fb_set_suspend(fb_info, 1);
+	fb_set_suspend(dev_priv->fbdev_info, 1);
 	release_console_sem();
-	if (fb_info)
-		fb_info->flags = fbdev_flags;
+	dev_priv->fbdev_info->flags = fbdev_flags;
 	return 0;
 
 out_abort:
@@ -222,23 +223,14 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_engine *engine = &dev_priv->engine;
 	struct drm_crtc *crtc;
-	struct drm_framebuffer *fb = NULL;
-	struct fb_info *fb_info = NULL;
-	uint32_t fbdev_flags = 0;
-	int ret;
+	uint32_t fbdev_flags;
+	int ret, i;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -ENODEV;
 
-	if (!list_empty(&dev->mode_config.fb_kernel_list))
-		fb = list_first_entry(&dev->mode_config.fb_kernel_list,
-				      struct drm_framebuffer, filp_head);
-
-	if (fb) {
-		fb_info = fb->fbdev;
-		fbdev_flags =fb_info->flags;
-		fb_info->flags |= FBINFO_HWACCEL_DISABLED;
-	}
+	fbdev_flags = dev_priv->fbdev_info->flags;
+	dev_priv->fbdev_info->flags |= FBINFO_HWACCEL_DISABLED;
 
 	NV_INFO(dev, "We're back, enabling device...\n");
 	pci_set_power_state(pdev, PCI_D0);
@@ -273,9 +265,30 @@ nouveau_pci_resume(struct pci_dev *pdev)
 
 	nouveau_irq_postinstall(dev);
 
+	/* Re-write SKIPS, they'll have been lost over the suspend */
+	if (nouveau_vram_pushbuf) {
+		struct nouveau_channel *chan;
+		int j;
+
+		for (i = 0; i < dev_priv->engine.fifo.channels; i++) {
+			chan = dev_priv->fifos[i];
+			if (!chan)
+				continue;
+
+			for (j = 0; j < NOUVEAU_DMA_SKIPS; j++)
+				nouveau_bo_wr32(chan->pushbuf_bo, i, 0);
+		}
+	}
+
 	if (dev_priv->card_type < NV_50) {
-		engine->fifo.load_context(dev_priv->channel);
-		engine->graph.load_context(dev_priv->channel);
+		struct nouveau_channel *chan = dev_priv->channel;
+		int ptr = chan->pushbuf_base + (chan->dma.cur << 2);
+
+		nvchan_wr32(chan->user_get, ptr);
+		nvchan_wr32(chan->user_put, ptr);
+
+		engine->fifo.load_context(chan);
+		engine->graph.load_context(chan);
 	}
 
 	NV_INFO(dev, "Re-enabling acceleration..\n");
@@ -302,13 +315,11 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	}
 
 	acquire_console_sem();
-	if (fb_info)
-		fb_set_suspend(fb_info, 0);
+	fb_set_suspend(dev_priv->fbdev_info, 0);
 	release_console_sem();
 
 	drm_helper_resume_force_mode(dev);
-	if (fb_info)
-		fb_info->flags = fbdev_flags;
+	dev_priv->fbdev_info->flags = fbdev_flags;
 	return 0;
 }
 
