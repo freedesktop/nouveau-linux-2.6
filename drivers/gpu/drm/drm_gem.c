@@ -35,7 +35,6 @@
 #include <linux/mman.h>
 #include <linux/pagemap.h>
 #include "drmP.h"
-#include "drm_compat.h"
 
 /** @file drm_gem.c
  *

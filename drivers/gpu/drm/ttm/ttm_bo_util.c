@@ -35,7 +35,6 @@
 #include <linux/wait.h>
 #include <linux/vmalloc.h>
 #include <linux/module.h>
-#include "drm_compat.h"
 
 void ttm_bo_free_old_node(struct ttm_buffer_object *bo)
 {
@@ -148,7 +147,7 @@ static int ttm_copy_io_ttm_page(struct ttm_tt *ttm, void *src,
 
 	src = (void *)((unsigned long)src + (page << PAGE_SHIFT));
 
-#ifdef CONFIG_X86_EXPORTED_KMAP_ATOMIC_PROT
+#ifdef CONFIG_X86
 	dst = kmap_atomic_prot(d, KM_USER0, prot);
 #else
 	if (pgprot_val(prot) != pgprot_val(PAGE_KERNEL))
@@ -161,7 +160,7 @@ static int ttm_copy_io_ttm_page(struct ttm_tt *ttm, void *src,
 
 	memcpy_fromio(dst, src, PAGE_SIZE);
 
-#ifdef CONFIG_X86_EXPORTED_KMAP_ATOMIC_PROT
+#ifdef CONFIG_X86
 	kunmap_atomic(dst, KM_USER0);
 #else
 	if (pgprot_val(prot) != pgprot_val(PAGE_KERNEL))
@@ -184,7 +183,7 @@ static int ttm_copy_ttm_io_page(struct ttm_tt *ttm, void *dst,
 		return -ENOMEM;
 
 	dst = (void *)((unsigned long)dst + (page << PAGE_SHIFT));
-#ifdef CONFIG_X86_EXPORTED_KMAP_ATOMIC_PROT
+#ifdef CONFIG_X86
 	src = kmap_atomic_prot(s, KM_USER0, prot);
 #else
 	if (pgprot_val(prot) != pgprot_val(PAGE_KERNEL))
@@ -197,7 +196,7 @@ static int ttm_copy_ttm_io_page(struct ttm_tt *ttm, void *dst,
 
 	memcpy_toio(dst, src, PAGE_SIZE);
 
-#ifdef CONFIG_X86_EXPORTED_KMAP_ATOMIC_PROT
+#ifdef CONFIG_X86
 	kunmap_atomic(src, KM_USER0);
 #else
 	if (pgprot_val(prot) != pgprot_val(PAGE_KERNEL))
