@@ -66,6 +66,13 @@ MODULE_PARM_DESC(tv_norm, "Default TV norm.\n"
 char *nouveau_tv_norm = NULL;
 module_param_named(tv_norm, nouveau_tv_norm, charp, 0400);
 
+MODULE_PARM_DESC(reg_debug, "Register access debug bitmask:\n"
+		"\t\t0x1 mc, 0x2 video, 0x4 fb, 0x8 extdev,\n"
+		"\t\t0x10 crtc, 0x20 ramdac, 0x40 vgacrtc, 0x80 rmvio,\n"
+		"\t\t0x100 vgaattr. ");
+int nouveau_reg_debug;
+module_param_named(reg_debug, nouveau_reg_debug, int, 0600);
+
 int nouveau_fbpercrtc = 0;
 #if 0
 module_param_named(fbpercrtc, nouveau_fbpercrtc, int, 0400);
@@ -301,9 +308,20 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	engine->graph.fifo_access(dev, true);
 
 	NV_INFO(dev, "Restoring mode...\n");
-	if (dev_priv->card_type < NV_50)
+	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+		struct nouveau_framebuffer *nouveau_fb;
+
+		nouveau_fb = nouveau_framebuffer(crtc->fb);
+		if (!nouveau_fb || !nouveau_fb->nvbo)
+			continue;
+
+		nouveau_bo_pin(nouveau_fb->nvbo, TTM_PL_FLAG_VRAM);
+	}
+
+	if (dev_priv->card_type < NV_50) {
 		nv04_display_restore(dev);
-	else
+		NVLockVgaCrtcs(dev, false);
+	} else
 		nv50_display_init(dev);
 
 	/* Force CLUT to get re-loaded during modeset */

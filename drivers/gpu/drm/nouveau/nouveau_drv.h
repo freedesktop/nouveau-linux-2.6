@@ -68,6 +68,7 @@ struct nouveau_bo {
 	struct ttm_bo_kmap_obj kmap;
 	struct list_head head;
 
+	struct drm_file *reserved_by;
 	struct list_head entry;
 
 	struct nouveau_channel *channel;
@@ -158,8 +159,7 @@ struct nouveau_gpuobj_ref {
 	int handle;
 };
 
-struct nouveau_channel
-{
+struct nouveau_channel {
 	struct drm_device *dev;
 	int id;
 
@@ -484,6 +484,7 @@ struct drm_nouveau_private {
 		struct ttm_bo_device bdev;
 		spinlock_t bo_list_lock;
 		struct list_head bo_list;
+		atomic_t validate_sequence;
 	} ttm;
 
 	struct fb_info *fbdev_info;
@@ -620,6 +621,7 @@ extern int nouveau_uscript_tmds;
 extern int nouveau_vram_pushbuf;
 extern int nouveau_fbpercrtc;
 extern char *nouveau_tv_norm;
+extern int nouveau_reg_debug;
 
 /* nouveau_state.c */
 extern void nouveau_preclose(struct drm_device *dev, struct drm_file *);
@@ -697,7 +699,7 @@ extern int nouveau_gpuobj_channel_init(struct nouveau_channel *,
 				       uint32_t vram_h, uint32_t tt_h);
 extern void nouveau_gpuobj_channel_takedown(struct nouveau_channel *);
 extern int nouveau_gpuobj_new(struct drm_device *, struct nouveau_channel *,
-			      int size, int align, uint32_t flags,
+			      uint32_t size, int align, uint32_t flags,
 			      struct nouveau_gpuobj **);
 extern int nouveau_gpuobj_del(struct drm_device *, struct nouveau_gpuobj **);
 extern int nouveau_gpuobj_ref_add(struct drm_device *, struct nouveau_channel *,
@@ -710,7 +712,7 @@ extern int nouveau_gpuobj_ref_find(struct nouveau_channel *, uint32_t handle,
 extern int nouveau_gpuobj_new_ref(struct drm_device *,
 				  struct nouveau_channel *alloc_chan,
 				  struct nouveau_channel *ref_chan,
-				  uint32_t handle, int size, int align,
+				  uint32_t handle, uint32_t size, int align,
 				  uint32_t flags, struct nouveau_gpuobj_ref **);
 extern int nouveau_gpuobj_new_fake(struct drm_device *,
 				   uint32_t p_offset, uint32_t b_offset,
@@ -1110,6 +1112,24 @@ static inline void nv_wo32(struct drm_device *dev, struct nouveau_gpuobj *obj,
 #define NV_TRACEWARN(d, fmt, arg...) NV_PRINTK(KERN_NOTICE, d, fmt, ##arg)
 #define NV_TRACE(d, fmt, arg...) NV_PRINTK(KERN_INFO, d, fmt, ##arg)
 #define NV_WARN(d, fmt, arg...) NV_PRINTK(KERN_WARNING, d, fmt, ##arg)
+
+/* nouveau_reg_debug bitmask */
+enum {
+	NOUVEAU_REG_DEBUG_MC             = 0x1,
+	NOUVEAU_REG_DEBUG_VIDEO          = 0x2,
+	NOUVEAU_REG_DEBUG_FB             = 0x4,
+	NOUVEAU_REG_DEBUG_EXTDEV         = 0x8,
+	NOUVEAU_REG_DEBUG_CRTC           = 0x10,
+	NOUVEAU_REG_DEBUG_RAMDAC         = 0x20,
+	NOUVEAU_REG_DEBUG_VGACRTC        = 0x40,
+	NOUVEAU_REG_DEBUG_RMVIO          = 0x80,
+	NOUVEAU_REG_DEBUG_VGAATTR        = 0x100,
+};
+
+#define NV_REG_DEBUG(type, dev, fmt, arg...) do { \
+	if (nouveau_reg_debug & NOUVEAU_REG_DEBUG_##type) \
+		NV_PRINTK(KERN_DEBUG, dev, "%s: " fmt, __func__, ##arg); \
+} while (0)
 
 static inline enum nouveau_card_type
 nv_arch(struct drm_device *dev)

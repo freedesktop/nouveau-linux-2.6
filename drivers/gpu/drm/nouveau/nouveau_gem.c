@@ -238,9 +238,10 @@ nouveau_gem_pushbuf_backoff(struct list_head *list)
 	list_for_each_safe(entry, tmp, list) {
 		nvbo = list_entry(entry, struct nouveau_bo, entry);
 
-		drm_gem_object_unreference(nvbo->gem);
-		ttm_bo_unreserve(&nvbo->bo);
 		list_del(&nvbo->entry);
+		nvbo->reserved_by = NULL;
+		ttm_bo_unreserve(&nvbo->bo);
+		drm_gem_object_unreference(nvbo->gem);
 	}
 }
 
@@ -259,9 +260,10 @@ nouveau_gem_pushbuf_fence(struct list_head *list, struct nouveau_fence *fence)
 		nvbo->bo.sync_obj = nouveau_fence_ref(fence);
 		spin_unlock(&nvbo->bo.lock);
 
-		drm_gem_object_unreference(nvbo->gem);
-		ttm_bo_unreserve(&nvbo->bo);
 		list_del(&nvbo->entry);
+		nvbo->reserved_by = NULL;
+		ttm_bo_unreserve(&nvbo->bo);
+		drm_gem_object_unreference(nvbo->gem);
 
 		nouveau_fence_unref((void *)&prev_fence);
 	}
@@ -274,6 +276,7 @@ nouveau_gem_pushbuf_validate(struct nouveau_channel *chan,
 			     uint64_t user_buffers, int nr_buffers,
 			     struct list_head *list, int *apply_relocs)
 {
+	struct drm_nouveau_private *dev_priv = chan->dev->dev_private;
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_gem_pushbuf_bo *b;
 	struct drm_nouveau_gem_pushbuf_bo __user *user_pbbos =
@@ -281,13 +284,22 @@ nouveau_gem_pushbuf_validate(struct nouveau_channel *chan,
 	struct nouveau_fence *prev_fence;
 	struct nouveau_bo *nvbo;
 	struct list_head *entry, *tmp;
+	uint32_t sequence;
 	int ret = -EINVAL;
 	int i;
+	int trycnt = 0;
 
 	if (nr_buffers == 0)
 		return 0;
 
+	sequence = atomic_add_return(1, &dev_priv->ttm.validate_sequence);
 retry:
+	if (++trycnt > 100000) {
+		ret = -EINVAL;
+		NV_ERROR(dev, "%s failed and gave up.\n", __func__);
+		goto out_unref;
+	}
+
 	for (i = 0, b = pbbo; i < nr_buffers; i++, b++) {
 		struct drm_gem_object *gem;
 
@@ -299,18 +311,26 @@ retry:
 		}
 		nvbo = gem->driver_private;
 
-		ret = ttm_bo_reserve(&nvbo->bo, false, false, true,
-				     chan->fence.sequence);
+		if (nvbo->reserved_by && nvbo->reserved_by == file_priv) {
+			NV_INFO(dev, "multiple instances of buffer %d on "
+				     "validation list\n", b->handle);
+			ret = -EINVAL;
+			goto out_unref;
+		}
+
+		ret = ttm_bo_reserve(&nvbo->bo, false, false, true, sequence);
 		if (ret) {
 			nouveau_gem_pushbuf_backoff(list);
-			if (ret == -EAGAIN) {
+			if (ret == -EAGAIN)
 				ret = ttm_bo_wait_unreserved(&nvbo->bo, false);
-				if (unlikely(ret))
-					goto out_unref;
-				goto retry;
-			} else
+			drm_gem_object_unreference(gem);
+			if (ret)
 				goto out_unref;
+			goto retry;
 		}
+
+		nvbo->reserved_by = file_priv;
+		list_add_tail(&nvbo->entry, list);
 
 		if (unlikely(atomic_read(&nvbo->bo.cpu_writers) > 0)) {
 			nouveau_gem_pushbuf_backoff(list);
@@ -319,8 +339,6 @@ retry:
 				goto out_unref;
 			goto retry;
 		}
-
-		list_add_tail(&nvbo->entry, list);
 	}
 
 	b = pbbo;

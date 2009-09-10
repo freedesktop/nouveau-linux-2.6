@@ -148,11 +148,14 @@ nv50_crtc_blank(struct nouveau_crtc *crtc, bool blanked)
 		OUT_RING  (evo, crtc->fb.offset >> 8);
 		OUT_RING  (evo, 0);
 		BEGIN_RING(evo, 0, NV50_EVO_CRTC(index, FB_DMA), 1);
-		if (dev_priv->chipset != 0x50 && crtc->fb.tiled)
-			if (crtc->fb.cpp == 2)
+		if (dev_priv->chipset != 0x50)
+			if (crtc->fb.tile_flags == 0x7a00)
+				OUT_RING(evo, NvEvoFB32);
+			else
+			if (crtc->fb.tile_flags == 0x7000)
 				OUT_RING(evo, NvEvoFB16);
 			else
-				OUT_RING(evo, NvEvoFB32);
+				OUT_RING(evo, NvEvoVRAM);
 		else
 			OUT_RING(evo, NvEvoVRAM);
 	}
@@ -365,47 +368,44 @@ nv50_crtc_cursor_set(struct drm_crtc *drm_crtc, struct drm_file *file_priv,
 		     uint32_t buffer_handle, uint32_t width, uint32_t height)
 {
 	struct drm_device *dev = drm_crtc->dev;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_crtc *crtc = nouveau_crtc(drm_crtc);
 	struct nouveau_bo *cursor = NULL;
-	int ret = 0;
+	struct drm_gem_object *gem;
+	int ret = 0, i;
 
 	if (width != 64 || height != 64)
 		return -EINVAL;
 
-	if (buffer_handle) {
-		struct drm_nouveau_private *dev_priv = dev->dev_private;
-		struct drm_gem_object *gem;
-		struct nouveau_bo *nvbo;
-		int i;
-
-		gem = drm_gem_object_lookup(dev, file_priv, buffer_handle);
-		if (!gem)
-			return -EINVAL;
-		nvbo = nouveau_gem_object(gem);
-
-		nouveau_bo_ref(nvbo, &cursor);
-		mutex_lock(&dev->struct_mutex);
-		drm_gem_object_unreference(gem);
-		mutex_unlock(&dev->struct_mutex);
-
-		ret = nouveau_bo_map(nvbo);
-		if (ret)
-			goto out;
-
-		/* The simple will do for now. */
-		for (i = 0; i < 64*64; i++)
-			nouveau_bo_wr32(crtc->cursor.nvbo, i, nouveau_bo_rd32(nvbo, i));
-
-		nouveau_bo_unmap(nvbo);
-
-		crtc->cursor.offset = crtc->cursor.nvbo->bo.offset - dev_priv->vm_vram_base;
-		crtc->cursor.set_offset(crtc, crtc->cursor.offset);
-		crtc->cursor.show(crtc, true);
-	} else {
+	if (!buffer_handle) {
 		crtc->cursor.hide(crtc, true);
+		return 0;
 	}
 
+	gem = drm_gem_object_lookup(dev, file_priv, buffer_handle);
+	if (!gem)
+		return -EINVAL;
+	cursor = nouveau_gem_object(gem);
+
+	ret = nouveau_bo_map(cursor);
+	if (ret)
+		goto out;
+
+	/* The simple will do for now. */
+	for (i = 0; i < 64 * 64; i++)
+		nouveau_bo_wr32(crtc->cursor.nvbo, i, nouveau_bo_rd32(cursor, i));
+
+	nouveau_bo_unmap(cursor);
+
+	crtc->cursor.offset  = crtc->cursor.nvbo->bo.offset;
+	crtc->cursor.offset -= dev_priv->vm_vram_base;
+	crtc->cursor.set_offset(crtc, crtc->cursor.offset);
+	crtc->cursor.show(crtc, true);
+
 out:
+	mutex_lock(&dev->struct_mutex);
+	drm_gem_object_unreference(gem);
+	mutex_unlock(&dev->struct_mutex);
 	return ret;
 }
 
@@ -564,7 +564,7 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 	}
 
 	crtc->fb.offset = fb->nvbo->bo.offset - dev_priv->vm_vram_base;
-	crtc->fb.tiled = fb->nvbo->tile_flags ? true : false;
+	crtc->fb.tile_flags = fb->nvbo->tile_flags;
 	crtc->fb.cpp = drm_fb->bits_per_pixel / 8;
 	if (!crtc->fb.blanked && dev_priv->chipset != 0x50) {
 		ret = RING_SPACE(evo, 2);
@@ -572,12 +572,12 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 			return ret;
 
 		BEGIN_RING(evo, 0, NV50_EVO_CRTC(crtc->index, FB_DMA), 1);
-		if (crtc->fb.tiled) {
-			if (crtc->fb.cpp == 4)
-				OUT_RING  (evo, NvEvoFB32);
-			else
-				OUT_RING  (evo, NvEvoFB16);
-		} else
+		if (crtc->fb.tile_flags == 0x7a00)
+			OUT_RING  (evo, NvEvoFB32);
+		else
+		if (crtc->fb.tile_flags == 0x7000)
+			OUT_RING  (evo, NvEvoFB16);
+		else
 			OUT_RING  (evo, NvEvoVRAM);
 	}
 
@@ -589,7 +589,7 @@ nv50_crtc_do_mode_set_base(struct drm_crtc *drm_crtc, int x, int y,
 	OUT_RING  (evo, crtc->fb.offset >> 8);
 	OUT_RING  (evo, 0);
 	OUT_RING  (evo, (drm_fb->height << 16) | drm_fb->width);
-	if (!crtc->fb.tiled) {
+	if (!crtc->fb.tile_flags) {
 		OUT_RING  (evo, drm_fb->pitch | (1 << 20));
 	} else {
 		OUT_RING  (evo, ((drm_fb->pitch / 4) << 4) |
