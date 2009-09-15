@@ -393,8 +393,9 @@ struct moderec {
 };
 
 static struct moderec scaler_modes[] = {
-	{ 1920, 1440 },
-	{ 1920, 1280 },
+	{ 1920, 1200 },
+	{ 1920, 1080 },
+	{ 1680, 1050 },
 	{ 1600, 1200 },
 	{ 1400, 1050 },
 	{ 1280, 1024 },
@@ -503,6 +504,7 @@ nouveau_connector_mode_valid(struct drm_connector *connector,
 		    mode->vdisplay > nv_connector->native_mode->vdisplay)
 			return MODE_PANEL;
 
+		min_clock = 0;
 		max_clock = 400000;
 		break;
 	case OUTPUT_TMDS:
@@ -610,7 +612,8 @@ nouveau_connector_create_lvds(struct drm_device *dev,
 	/* Still nothing, some VBIOS images have a hardcoded EDID block
 	 * stored for the panel stored in them.
 	 */
-	if (!nv_connector->edid && !dev_priv->VBIOS.pub.fp_no_ddc) {
+	if (!nv_connector->edid && !nv_connector->native_mode &&
+	    !dev_priv->VBIOS.pub.fp_no_ddc) {
 		nv_connector->edid =
 			(struct edid *)nouveau_bios_embedded_edid(dev);
 	}
