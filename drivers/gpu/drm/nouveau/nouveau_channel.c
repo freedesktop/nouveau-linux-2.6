@@ -167,13 +167,12 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	else
 		user = NV50_USER(channel);
 
-	ret = drm_addmap(dev, drm_get_resource_start(dev, 0) + user,
-			 PAGE_SIZE, _DRM_REGISTERS, _DRM_DRIVER |
-			 _DRM_READ_ONLY, &chan->user);
-	if (ret) {
-		NV_ERROR(dev, "regs %d\n", ret);
+	chan->user = ioremap(pci_resource_start(dev->pdev, 0) + user,
+								PAGE_SIZE);
+	if (!chan->user) {
+		NV_ERROR(dev, "ioremap of regs failed.\n");
 		nouveau_channel_free(chan);
-		return ret;
+		return -ENOMEM;
 	}
 	chan->user_put = 0x40;
 	chan->user_get = 0x44;
@@ -240,8 +239,8 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	    dev_priv->fifo_alloc_count == 1) {
 		/* setup channel's default get/put values
 		 */
-		nvchan_wr32(chan->user_get, chan->pushbuf_base);
-		nvchan_wr32(chan->user_put, chan->pushbuf_base);
+		nvchan_wr32(chan, chan->user_get, chan->pushbuf_base);
+		nvchan_wr32(chan, chan->user_put, chan->pushbuf_base);
 
 		ret = engine->fifo.load_context(chan);
 		if (ret) {
@@ -277,6 +276,8 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 		nouveau_channel_free(chan);
 		return ret;
 	}
+
+	nouveau_debugfs_channel_init(chan);
 
 	NV_INFO(dev, "%s: initialised FIFO %d\n", __func__, channel);
 	*chan_ret = chan;
@@ -337,6 +338,8 @@ nouveau_channel_free(struct nouveau_channel *chan)
 	int ret;
 
 	NV_INFO(dev, "%s: freeing fifo %d\n", __func__, chan->id);
+
+	nouveau_debugfs_channel_fini(chan);
 
 	/* Give the channel a chance to idle, wait 2s (hopefully) */
 	t_start = engine->timer.read(dev);
@@ -412,7 +415,7 @@ nouveau_channel_free(struct nouveau_channel *chan)
 	nouveau_notifier_takedown_channel(chan);
 
 	if (chan->user)
-		drm_rmmap(dev, chan->user);
+		iounmap(chan->user);
 
 	dev_priv->fifos[chan->id] = NULL;
 	dev_priv->fifo_alloc_count--;

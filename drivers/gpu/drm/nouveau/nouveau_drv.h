@@ -169,7 +169,7 @@ struct nouveau_channel {
 	struct drm_local_map *map;
 
 	/* mapping of the regs controling the fifo */
-	struct drm_local_map *user;
+	void __iomem *user;
 	uint32_t user_get;
 	uint32_t user_put;
 
@@ -235,6 +235,12 @@ struct nouveau_channel {
 		uint32_t vblsem_rval;
 		struct list_head vbl_wait;
 	} nvsw;
+
+	struct {
+		bool active;
+		char name[32];
+		struct drm_info_list info;
+	} debugfs;
 };
 
 struct nouveau_instmem_engine {
@@ -569,6 +575,10 @@ struct drm_nouveau_private {
 	bool acpi_dsm;
 
 	struct nouveau_channel *evo;
+
+	struct {
+		struct dentry *channel_root;
+	} debugfs;
 };
 
 static inline struct drm_nouveau_private *
@@ -746,6 +756,35 @@ extern void nouveau_sgdma_takedown(struct drm_device *);
 extern int nouveau_sgdma_get_page(struct drm_device *, uint32_t offset,
 				  uint32_t *page);
 extern struct ttm_backend *nouveau_sgdma_init_ttm(struct drm_device *);
+
+/* nouveau_debugfs.c */
+#if defined(CONFIG_DEBUG_FS)
+extern int  nouveau_debugfs_init(struct drm_minor *);
+extern void nouveau_debugfs_takedown(struct drm_minor *);
+extern int  nouveau_debugfs_channel_init(struct nouveau_channel *);
+extern void nouveau_debugfs_channel_fini(struct nouveau_channel *);
+#else
+static inline int
+nouveau_debugfs_init(struct drm_minor *minor)
+{
+	return 0;
+}
+
+static inline void nouveau_debugfs_takedown(struct drm_minor *minor)
+{
+}
+
+static inline int
+nouveau_debugfs_channel_init(struct nouveau_channel *chan)
+{
+	return 0;
+}
+
+static inline void
+nouveau_debugfs_channel_fini(struct nouveau_channel *chan)
+{
+}
+#endif
 
 /* nouveau_dma.c */
 extern int  nouveau_dma_init(struct nouveau_channel *);
@@ -1047,11 +1086,16 @@ extern int nouveau_gem_ioctl_info(struct drm_device *, void *,
 #endif /* !ioread32_native */
 
 /* channel control reg access */
-#define nvchan_wr32(reg, val) \
-	iowrite32_native((val), \
-			(void __force __iomem *)chan->user->handle + (reg))
-#define nvchan_rd32(reg) \
-	ioread32_native((void __force __iomem *)chan->user->handle + (reg))
+static inline u32 nvchan_rd32(struct nouveau_channel *chan, unsigned reg)
+{
+	return ioread32_native(chan->user + reg);
+}
+
+static inline void nvchan_wr32(struct nouveau_channel *chan,
+							unsigned reg, u32 val)
+{
+	iowrite32_native(val, chan->user + reg);
+}
 
 /* register access */
 static inline u32 nv_rd32(struct drm_device *dev, unsigned reg)
