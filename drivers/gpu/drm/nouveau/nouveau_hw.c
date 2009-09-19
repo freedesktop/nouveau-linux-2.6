@@ -467,7 +467,8 @@ nouveau_hw_get_pllvals(struct drm_device *dev, enum pll_types plltype,
 
 	nouveau_hw_decode_pll(dev, reg1, pll1, pll2, pllvals);
 
-	if ((ret = get_pll_limits(dev, plltype, &pll_lim)))
+	ret = get_pll_limits(dev, plltype, &pll_lim);
+	if (ret)
 		return ret;
 
 	pllvals->refclk = pll_lim.refclk;
@@ -482,7 +483,7 @@ nouveau_hw_pllvals_to_clk(struct nouveau_pll_vals *pv)
 	if (!pv->M1 || !pv->M2)
 		return 0;
 
-	return (pv->N1 * pv->N2 * pv->refclk / (pv->M1 * pv->M2) >> pv->log2P);
+	return pv->N1 * pv->N2 * pv->refclk / (pv->M1 * pv->M2) >> pv->log2P;
 }
 
 int
@@ -653,7 +654,7 @@ nv_save_state_ramdac(struct drm_device *dev, int head,
 		     struct nv04_mode_state *state)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nv04_crtc_reg * regp = &state->crtc_reg[head];
+	struct nv04_crtc_reg *regp = &state->crtc_reg[head];
 	int i;
 
 	if (nv_arch(dev) >= NV_10)
@@ -728,7 +729,7 @@ nv_load_state_ramdac(struct drm_device *dev, int head,
 		     struct nv04_mode_state *state)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nv04_crtc_reg * regp = &state->crtc_reg[head];
+	struct nv04_crtc_reg *regp = &state->crtc_reg[head];
 	uint32_t pllreg = head ? NV_RAMDAC_VPLL2 : NV_PRAMDAC_VPLL_COEFF;
 	int i;
 
@@ -798,7 +799,7 @@ static void
 nv_save_state_vga(struct drm_device *dev, int head,
 		  struct nv04_mode_state *state)
 {
-	struct nv04_crtc_reg * regp = &state->crtc_reg[head];
+	struct nv04_crtc_reg *regp = &state->crtc_reg[head];
 	int i;
 
 	regp->MiscOutReg = NVReadPRMVIO(dev, head, NV_PRMVIO_MISC__READ);
@@ -822,7 +823,7 @@ static void
 nv_load_state_vga(struct drm_device *dev, int head,
 		  struct nv04_mode_state *state)
 {
-	struct nv04_crtc_reg * regp = &state->crtc_reg[head];
+	struct nv04_crtc_reg *regp = &state->crtc_reg[head];
 	int i;
 
 	NVWritePRMVIO(dev, head, NV_PRMVIO_MISC__WRITE, regp->MiscOutReg);
@@ -848,7 +849,7 @@ static void
 nv_save_state_ext(struct drm_device *dev, int head,
 		  struct nv04_mode_state *state)
 {
-	struct nv04_crtc_reg * regp = &state->crtc_reg[head];
+	struct nv04_crtc_reg *regp = &state->crtc_reg[head];
 	int i;
 
 	rd_cio_state(dev, head, regp, NV_CIO_CRE_LCD__INDEX);
@@ -917,7 +918,7 @@ nv_load_state_ext(struct drm_device *dev, int head,
 		  struct nv04_mode_state *state)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nv04_crtc_reg * regp = &state->crtc_reg[head];
+	struct nv04_crtc_reg *regp = &state->crtc_reg[head];
 	uint32_t reg900;
 	int i;
 

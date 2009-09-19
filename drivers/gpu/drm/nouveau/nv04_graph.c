@@ -27,7 +27,7 @@
 #include "nouveau_drm.h"
 #include "nouveau_drv.h"
 
-static uint32_t nv04_graph_ctx_regs [] = {
+static uint32_t nv04_graph_ctx_regs[] = {
 	NV04_PGRAPH_CTX_SWITCH1,
 	NV04_PGRAPH_CTX_SWITCH2,
 	NV04_PGRAPH_CTX_SWITCH3,
@@ -418,16 +418,17 @@ void nv04_graph_context_switch(struct drm_device *dev)
 	nv_wr32(dev, NV04_PGRAPH_FIFO, 0x1);
 }
 
-int nv04_graph_create_context(struct nouveau_channel *chan) {
-	struct graph_state* pgraph_ctx;
-	NV_DEBUG(chan-> dev, "nv04_graph_context_create %d\n", chan->id);
+int nv04_graph_create_context(struct nouveau_channel *chan)
+{
+	struct graph_state *pgraph_ctx;
+	NV_DEBUG(chan->dev, "nv04_graph_context_create %d\n", chan->id);
 
 	chan->pgraph_ctx = pgraph_ctx = kzalloc(sizeof(*pgraph_ctx),
 						GFP_KERNEL);
 	if (pgraph_ctx == NULL)
 		return -ENOMEM;
 
-	//dev_priv->fifos[channel].pgraph_ctx_user = channel << 24;
+	/* dev_priv->fifos[channel].pgraph_ctx_user = channel << 24; */
 	pgraph_ctx->nv04[0] = 0x0001ffff;
 	/* is it really needed ??? */
 #if 0
@@ -441,7 +442,7 @@ int nv04_graph_create_context(struct nouveau_channel *chan) {
 
 void nv04_graph_destroy_context(struct nouveau_channel *chan)
 {
-	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
+	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
 
 	kfree(pgraph_ctx);
 	chan->pgraph_ctx = NULL;
@@ -450,7 +451,7 @@ void nv04_graph_destroy_context(struct nouveau_channel *chan)
 int nv04_graph_load_context(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
-	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
+	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(nv04_graph_ctx_regs); i++)
@@ -462,7 +463,7 @@ int nv04_graph_load_context(struct nouveau_channel *chan)
 int nv04_graph_save_context(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
-	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
+	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(nv04_graph_ctx_regs); i++)
@@ -471,7 +472,8 @@ int nv04_graph_save_context(struct nouveau_channel *chan)
 	return 0;
 }
 
-int nv04_graph_init(struct drm_device *dev) {
+int nv04_graph_init(struct drm_device *dev)
+{
 	nv_wr32(dev, NV03_PMC_ENABLE, nv_rd32(dev, NV03_PMC_ENABLE) &
 			~NV_PMC_ENABLE_PGRAPH);
 	nv_wr32(dev, NV03_PMC_ENABLE, nv_rd32(dev, NV03_PMC_ENABLE) |

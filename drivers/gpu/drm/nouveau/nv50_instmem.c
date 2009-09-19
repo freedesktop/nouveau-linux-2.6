@@ -45,7 +45,7 @@ struct nv50_instmem_priv {
 
 /*NOTE: - Assumes 0x1700 already covers the correct MiB of PRAMIN
  */
-#define BAR0_WI32(g,o,v) do {                                     \
+#define BAR0_WI32(g, o, v) do {                                   \
 	uint32_t offset;                                          \
 	if ((g)->im_backing) {                                    \
 		offset = (g)->im_backing_start;                   \
@@ -55,7 +55,7 @@ struct nv50_instmem_priv {
 	}                                                         \
 	offset += (o);                                            \
 	nv_wr32(dev, NV_RAMIN + (offset & 0xfffff), (v));              \
-} while(0)
+} while (0)
 
 int
 nv50_instmem_init(struct drm_device *dev)
@@ -73,7 +73,7 @@ nv50_instmem_init(struct drm_device *dev)
 	dev_priv->engine.instmem.priv = priv;
 
 	/* Save state, will restore at takedown. */
-	for (i = 0x1700; i <= 0x1710; i+=4)
+	for (i = 0x1700; i <= 0x1710; i += 4)
 		priv->save1700[(i-0x1700)/4] = nv_rd32(dev, i);
 
 	/* Reserve the last MiB of VRAM, we should probably try to avoid
@@ -141,24 +141,27 @@ nv50_instmem_init(struct drm_device *dev)
 	dev_priv->fifos[0] = dev_priv->fifos[127] = chan;
 
 	/* Channel's PRAMIN object + heap */
-	if ((ret = nouveau_gpuobj_new_fake(dev, 0, c_offset, c_size, 0,
-					   NULL, &chan->ramin)))
+	ret = nouveau_gpuobj_new_fake(dev, 0, c_offset, c_size, 0,
+							NULL, &chan->ramin);
+	if (ret)
 		return ret;
 
 	if (nouveau_mem_init_heap(&chan->ramin_heap, c_base, c_size - c_base))
 		return -ENOMEM;
 
 	/* RAMFC + zero channel's PRAMIN up to start of VM pagedir */
-	if ((ret = nouveau_gpuobj_new_fake(dev, c_ramfc, c_offset + c_ramfc,
-					   0x4000, 0, NULL, &chan->ramfc)))
+	ret = nouveau_gpuobj_new_fake(dev, c_ramfc, c_offset + c_ramfc,
+						0x4000, 0, NULL, &chan->ramfc);
+	if (ret)
 		return ret;
 
 	for (i = 0; i < c_vmpd; i += 4)
 		BAR0_WI32(chan->ramin->gpuobj, i, 0);
 
 	/* VM page directory */
-	if ((ret = nouveau_gpuobj_new_fake(dev, c_vmpd, c_offset + c_vmpd,
-					   0x4000, 0, &chan->vm_pd, NULL)))
+	ret = nouveau_gpuobj_new_fake(dev, c_vmpd, c_offset + c_vmpd,
+					   0x4000, 0, &chan->vm_pd, NULL);
+	if (ret)
 		return ret;
 	for (i = 0; i < 0x4000; i += 8) {
 		BAR0_WI32(chan->vm_pd, i + 0x00, 0x00000000);
@@ -168,11 +171,12 @@ nv50_instmem_init(struct drm_device *dev)
 	/* PRAMIN page table, cheat and map into VM at 0x0000000000.
 	 * We map the entire fake channel into the start of the PRAMIN BAR
 	 */
-	if ((ret = nouveau_gpuobj_new_ref(dev, chan, NULL, 0, pt_size, 0x1000,
-					  0, &priv->pramin_pt)))
+	ret = nouveau_gpuobj_new_ref(dev, chan, NULL, 0, pt_size, 0x1000,
+							0, &priv->pramin_pt);
+	if (ret)
 		return ret;
 
-	for (i = 0, v = c_offset; i < pt_size; i+=8, v+=0x1000) {
+	for (i = 0, v = c_offset; i < pt_size; i += 8, v += 0x1000) {
 		if (v < (c_offset + c_size))
 			BAR0_WI32(priv->pramin_pt->gpuobj, i + 0, v | 1);
 		else
@@ -189,13 +193,15 @@ nv50_instmem_init(struct drm_device *dev)
 					     NV50_VM_BLOCK/65536*8, 0, 0,
 					     &chan->vm_vram_pt[i]);
 		if (ret) {
-			NV_ERROR(dev, "Error creating VRAM page tables: %d\n", ret);
+			NV_ERROR(dev, "Error creating VRAM page tables: %d\n",
+									ret);
 			dev_priv->vm_vram_pt_nr = i;
 			return ret;
 		}
 		dev_priv->vm_vram_pt[i] = chan->vm_vram_pt[i]->gpuobj;
 
-		for (v = 0; v < dev_priv->vm_vram_pt[i]->im_pramin->size; v+=4)
+		for (v = 0; v < dev_priv->vm_vram_pt[i]->im_pramin->size;
+								v += 4)
 			BAR0_WI32(dev_priv->vm_vram_pt[i], v, 0);
 
 		BAR0_WI32(chan->vm_pd, 0x10 + (i*8),
@@ -204,8 +210,9 @@ nv50_instmem_init(struct drm_device *dev)
 	}
 
 	/* DMA object for PRAMIN BAR */
-	if ((ret = nouveau_gpuobj_new_ref(dev, chan, chan, 0, 6*4, 16, 0,
-					  &priv->pramin_bar)))
+	ret = nouveau_gpuobj_new_ref(dev, chan, chan, 0, 6*4, 16, 0,
+							&priv->pramin_bar);
+	if (ret)
 		return ret;
 	BAR0_WI32(priv->pramin_bar->gpuobj, 0x00, 0x7fc00000);
 	BAR0_WI32(priv->pramin_bar->gpuobj, 0x04, dev_priv->ramin_size - 1);
@@ -215,8 +222,9 @@ nv50_instmem_init(struct drm_device *dev)
 	BAR0_WI32(priv->pramin_bar->gpuobj, 0x14, 0x00000000);
 
 	/* DMA object for FB BAR */
-	if ((ret = nouveau_gpuobj_new_ref(dev, chan, chan, 0, 6*4, 16, 0,
-					  &priv->fb_bar)))
+	ret = nouveau_gpuobj_new_ref(dev, chan, chan, 0, 6*4, 16, 0,
+							&priv->fb_bar);
+	if (ret)
 		return ret;
 	BAR0_WI32(priv->fb_bar->gpuobj, 0x00, 0x7fc00000);
 	BAR0_WI32(priv->fb_bar->gpuobj, 0x04, 0x40000000 +
@@ -242,9 +250,10 @@ nv50_instmem_init(struct drm_device *dev)
 	/* Assume that praying isn't enough, check that we can re-read the
 	 * entire fake channel back from the PRAMIN BAR */
 	dev_priv->engine.instmem.prepare_access(dev, false);
-	for (i = 0; i < c_size; i+=4) {
+	for (i = 0; i < c_size; i += 4) {
 		if (nv_rd32(dev, NV_RAMIN + i) != nv_ri32(dev, i)) {
-			NV_ERROR(dev, "Error reading back PRAMIN at 0x%08x\n", i);
+			NV_ERROR(dev, "Error reading back PRAMIN at 0x%08x\n",
+									i);
 			dev_priv->engine.instmem.finish_access(dev);
 			return -EINVAL;
 		}
@@ -281,8 +290,8 @@ nv50_instmem_takedown(struct drm_device *dev)
 		return;
 
 	/* Restore state from before init */
-	for (i = 0x1700; i <= 0x1710; i+=4)
-		nv_wr32(dev, i, priv->save1700[(i-0x1700)/4]);
+	for (i = 0x1700; i <= 0x1710; i += 4)
+		nv_wr32(dev, i, priv->save1700[(i - 0x1700) / 4]);
 
 	nouveau_gpuobj_ref_del(dev, &priv->fb_bar);
 	nouveau_gpuobj_ref_del(dev, &priv->pramin_bar);

@@ -155,7 +155,7 @@ int nouveau_mem_init_heap(struct mem_block **heap, uint64_t start,
 	blocks->next = blocks->prev = *heap;
 
 	memset(*heap, 0, sizeof(**heap));
-	(*heap)->file_priv = (struct drm_file *) - 1;
+	(*heap)->file_priv = (struct drm_file *) -1;
 	(*heap)->next = (*heap)->prev = blocks;
 	return 0;
 }
@@ -341,7 +341,7 @@ nouveau_mem_fb_amount_igp(struct drm_device *dev)
 	struct pci_dev *bridge;
 	uint32_t mem;
 
-	bridge = pci_get_bus_and_slot(0, PCI_DEVFN(0,1));
+	bridge = pci_get_bus_and_slot(0, PCI_DEVFN(0, 1));
 	if (!bridge) {
 		NV_ERROR(dev, "no bridge device\n");
 		return 0;
@@ -351,7 +351,7 @@ nouveau_mem_fb_amount_igp(struct drm_device *dev)
 		pci_read_config_dword(bridge, 0x7C, &mem);
 		return (uint64_t)(((mem >> 6) & 31) + 1)*1024*1024;
 	} else
-	if(dev_priv->flags&NV_NFORCE2) {
+	if (dev_priv->flags&NV_NFORCE2) {
 		pci_read_config_dword(bridge, 0x84, &mem);
 		return (uint64_t)(((mem >> 4) & 127) + 1)*1024*1024;
 	}
@@ -363,50 +363,49 @@ nouveau_mem_fb_amount_igp(struct drm_device *dev)
 /* returns the amount of FB ram in bytes */
 uint64_t nouveau_mem_fb_amount(struct drm_device *dev)
 {
-	struct drm_nouveau_private *dev_priv=dev->dev_private;
-	switch(dev_priv->card_type)
-	{
-		case NV_04:
-		case NV_05:
-			if (nv_rd32(dev, NV03_BOOT_0) & 0x00000100) {
-				return (((nv_rd32(dev, NV03_BOOT_0) >> 12) &
-						0xf) * 2 + 2) * 1024 * 1024;
-			} else
-			switch (nv_rd32(dev, NV03_BOOT_0) &
-						NV03_BOOT_0_RAM_AMOUNT)
-			{
-				case NV04_BOOT_0_RAM_AMOUNT_32MB:
-					return 32*1024*1024;
-				case NV04_BOOT_0_RAM_AMOUNT_16MB:
-					return 16*1024*1024;
-				case NV04_BOOT_0_RAM_AMOUNT_8MB:
-					return 8*1024*1024;
-				case NV04_BOOT_0_RAM_AMOUNT_4MB:
-					return 4*1024*1024;
-			}
-			break;
-		case NV_10:
-		case NV_11:
-		case NV_17:
-		case NV_20:
-		case NV_30:
-		case NV_40:
-		case NV_50:
-		default:
-			if (dev_priv->flags & (NV_NFORCE | NV_NFORCE2)) {
-				return nouveau_mem_fb_amount_igp(dev);
-			} else {
-				uint64_t mem;
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	switch (dev_priv->card_type) {
+	case NV_04:
+	case NV_05: {
+		uint32_t boot0 = nv_rd32(dev, NV03_BOOT_0);
+		if (boot0 & 0x00000100)
+			return (((boot0 >> 12) & 0xf) * 2 + 2) * 1024 * 1024;
 
-				mem = (nv_rd32(dev, NV04_FIFO_DATA) &
-				       NV10_FIFO_DATA_RAM_AMOUNT_MB_MASK) >>
-				      NV10_FIFO_DATA_RAM_AMOUNT_MB_SHIFT;
-				return mem*1024*1024;
-			}
-			break;
+		switch (boot0 & NV03_BOOT_0_RAM_AMOUNT) {
+		case NV04_BOOT_0_RAM_AMOUNT_32MB:
+			return 32 * 1024 * 1024;
+		case NV04_BOOT_0_RAM_AMOUNT_16MB:
+			return 16 * 1024 * 1024;
+		case NV04_BOOT_0_RAM_AMOUNT_8MB:
+			return 8 * 1024 * 1024;
+		case NV04_BOOT_0_RAM_AMOUNT_4MB:
+			return 4 * 1024 * 1024;
+		}
+		break;
+	}
+	case NV_10:
+	case NV_11:
+	case NV_17:
+	case NV_20:
+	case NV_30:
+	case NV_40:
+	case NV_50:
+	default:
+		if (dev_priv->flags & (NV_NFORCE | NV_NFORCE2)) {
+			return nouveau_mem_fb_amount_igp(dev);
+		} else {
+			uint64_t mem;
+			mem = (nv_rd32(dev, NV04_FIFO_DATA) &
+					NV10_FIFO_DATA_RAM_AMOUNT_MB_MASK) >>
+					NV10_FIFO_DATA_RAM_AMOUNT_MB_SHIFT;
+			return mem * 1024 * 1024;
+		}
+		break;
 	}
 
-	NV_ERROR(dev, "Unable to detect video ram size. Please report your setup to " DRIVER_EMAIL "\n");
+	NV_ERROR(dev,
+		"Unable to detect video ram size. Please report your setup to "
+							DRIVER_EMAIL "\n");
 	return 0;
 }
 
@@ -521,18 +520,22 @@ nouveau_mem_init(struct drm_device *dev)
 	bar1_size = drm_get_resource_len(dev, 1) >> PAGE_SHIFT;
 	text_size = (256 * 1024) >> PAGE_SHIFT;
 	if (bar1_size < vram_size) {
-		if (dev_priv->card_type < NV_50 &&
-		    (ret = ttm_bo_init_mm(bdev, TTM_PL_PRIV0, bar1_size,
-					  vram_size - bar1_size))) {
-			NV_ERROR(dev, "Failed PRIV0 mm init: %d\n", ret);
-			return ret;
+		if (dev_priv->card_type < NV_50) {
+			ret = ttm_bo_init_mm(bdev, TTM_PL_PRIV0, bar1_size,
+						vram_size - bar1_size);
+			if (ret) {
+				NV_ERROR(dev, "Failed PRIV0 mm init: %d\n",
+									ret);
+				return ret;
+			}
 		}
 		vram_size = bar1_size;
 	}
 
 	/* mappable vram */
-	if ((ret = ttm_bo_init_mm(bdev, TTM_PL_VRAM, text_size,
-				  vram_size - text_size))) {
+	ret = ttm_bo_init_mm(bdev, TTM_PL_VRAM, text_size,
+						vram_size - text_size);
+	if (ret) {
 		NV_ERROR(dev, "Failed VRAM mm init: %d\n", ret);
 		return ret;
 	}
@@ -540,18 +543,22 @@ nouveau_mem_init(struct drm_device *dev)
 	/* GART */
 #if !defined(__powerpc__) && !defined(__ia64__)
 	if (drm_device_is_agp(dev) && dev->agp) {
-		if ((ret = nouveau_mem_init_agp(dev)))
+		ret = nouveau_mem_init_agp(dev);
+		if (ret)
 			NV_ERROR(dev, "Error initialising AGP: %d\n", ret);
 	}
 #endif
 
 	if (dev_priv->gart_info.type == NOUVEAU_GART_NONE) {
-		if ((ret = nouveau_sgdma_init(dev)))
-			NV_ERROR(dev, "Error initialising PCI SGDMA: %d\n", ret);
+		ret = nouveau_sgdma_init(dev);
+		if (ret)
+			NV_ERROR(dev, "Error initialising PCI SGDMA: %d\n",
+									ret);
 	}
 
-	if ((ret = ttm_bo_init_mm(bdev, TTM_PL_TT, 0,
-				  dev_priv->gart_info.aper_size >> PAGE_SHIFT))) {
+	ret = ttm_bo_init_mm(bdev, TTM_PL_TT, 0,
+				dev_priv->gart_info.aper_size >> PAGE_SHIFT);
+	if (ret) {
 		NV_ERROR(dev, "Failed TT mm init: %d\n", ret);
 		return ret;
 	}

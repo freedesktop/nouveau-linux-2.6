@@ -116,8 +116,8 @@ struct mem_block {
 };
 
 enum nouveau_flags {
-	NV_NFORCE   =0x10000000,
-	NV_NFORCE2  =0x20000000
+	NV_NFORCE   = 0x10000000,
+	NV_NFORCE2  = 0x20000000
 };
 
 #define NVOBJ_ENGINE_SW		0
@@ -548,8 +548,8 @@ struct drm_nouveau_private {
 
 	struct mem_block *ramin_heap;
 
-        /* context table pointed to be NV_PGRAPH_CHANNEL_CTX_TABLE (0x400780) */
-        uint32_t ctx_table_size;
+	/* context table pointed to be NV_PGRAPH_CHANNEL_CTX_TABLE (0x400780) */
+	uint32_t ctx_table_size;
 	struct nouveau_gpuobj_ref *ctx_table;
 
 	struct list_head gpuobj_list;
@@ -612,9 +612,9 @@ nouveau_bo_ref(struct nouveau_bo *ref, struct nouveau_bo **pnvbo)
 		NV_ERROR(dev, "called without init\n");       \
 		return -EINVAL;                               \
 	}                                                     \
-} while(0)
+} while (0)
 
-#define NOUVEAU_GET_USER_CHANNEL_WITH_RETURN(id,cl,ch) do {      \
+#define NOUVEAU_GET_USER_CHANNEL_WITH_RETURN(id, cl, ch) do {    \
 	struct drm_nouveau_private *nv = dev->dev_private;       \
 	if (!nouveau_channel_owner(dev, (cl), (id))) {           \
 		NV_ERROR(dev, "pid %d doesn't own channel %d\n", \
@@ -622,7 +622,7 @@ nouveau_bo_ref(struct nouveau_bo *ref, struct nouveau_bo **pnvbo)
 		return -EPERM;                                   \
 	}                                                        \
 	(ch) = nv->fifos[(id)];                                  \
-} while(0)
+} while (0)
 
 /* nouveau_drv.c */
 extern int nouveau_noagp;
@@ -1122,8 +1122,8 @@ static inline void nv_wr08(struct drm_device *dev, unsigned reg, u8 val)
 	iowrite8(val, dev_priv->mmio + reg);
 }
 
-#define nv_wait(reg,mask,val) nouveau_wait_until(dev, 2000000000ULL, (reg),    \
-						 (mask), (val))
+#define nv_wait(reg, mask, val) \
+	nouveau_wait_until(dev, 2000000000ULL, (reg), (mask), (val))
 
 /* PRAMIN access */
 static inline u32 nv_ri32(struct drm_device *dev, unsigned offset)
@@ -1160,12 +1160,12 @@ static inline void nv_wo32(struct drm_device *dev, struct nouveau_gpuobj *obj,
 		NV_PRINTK(KERN_DEBUG, d, "%s:%d - " fmt, __func__,             \
 			  __LINE__, ##arg);                                    \
 	}                                                                      \
-} while(0)
+} while (0)
 #else
 #define NV_DEBUG(d, fmt, arg...) do {                                          \
 	if (drm_debug)                                                         \
-		NV_PRINTK(KERN_DEBUG, d, fmt,##arg);                           \
-} while(0)
+		NV_PRINTK(KERN_DEBUG, d, fmt, ##arg);                          \
+} while (0)
 #endif
 #define NV_ERROR(d, fmt, arg...) NV_PRINTK(KERN_ERR, d, fmt, ##arg)
 #define NV_INFO(d, fmt, arg...) NV_PRINTK(KERN_INFO, d, fmt, ##arg)

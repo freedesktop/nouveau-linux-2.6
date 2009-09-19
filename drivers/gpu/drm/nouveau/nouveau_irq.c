@@ -231,7 +231,7 @@ nouveau_fifo_irq_handler(struct drm_device *dev)
 
 struct nouveau_bitfield_names {
 	uint32_t mask;
-	const char * name;
+	const char *name;
 };
 
 static struct nouveau_bitfield_names nouveau_nstatus_names[] =
@@ -275,18 +275,18 @@ static struct nouveau_bitfield_names nouveau_nsource_names[] =
 
 static void
 nouveau_print_bitfield_names(uint32_t value,
-                             const struct nouveau_bitfield_names *namelist,
-                             const int namelist_len)
+				const struct nouveau_bitfield_names *namelist,
+				const int namelist_len)
 {
 	int i;
-	for(i=0; i<namelist_len; ++i) {
+	for (i = 0; i < namelist_len; ++i) {
 		uint32_t mask = namelist[i].mask;
-		if(value & mask) {
+		if (value & mask) {
 			printk(" %s", namelist[i].name);
 			value &= ~mask;
 		}
 	}
-	if(value)
+	if (value)
 		printk(" (unknown bits 0x%08x)", value);
 }
 
@@ -388,15 +388,14 @@ nouveau_graph_trap_info(struct drm_device *dev,
 		trap->data2 = nv_rd32(dev, NV10_PGRAPH_TRAPPED_DATA_HIGH);
 	}
 
-	if (dev_priv->card_type < NV_10) {
+	if (dev_priv->card_type < NV_10)
 		trap->class = nv_rd32(dev, 0x400180 + trap->subc*4) & 0xFF;
-	} else if (dev_priv->card_type < NV_40) {
+	else if (dev_priv->card_type < NV_40)
 		trap->class = nv_rd32(dev, 0x400160 + trap->subc*4) & 0xFFF;
-	} else if (dev_priv->card_type < NV_50) {
+	else if (dev_priv->card_type < NV_50)
 		trap->class = nv_rd32(dev, 0x400160 + trap->subc*4) & 0xFFFF;
-	} else {
+	else
 		trap->class = nv_rd32(dev, 0x400814);
-	}
 }
 
 static void
@@ -408,14 +407,15 @@ nouveau_graph_dump_trap_info(struct drm_device *dev, const char *id,
 
 	NV_INFO(dev, "%s - nSource:", id);
 	nouveau_print_bitfield_names(nsource, nouveau_nsource_names,
-	                             ARRAY_SIZE(nouveau_nsource_names));
+					ARRAY_SIZE(nouveau_nsource_names));
 	printk(", nStatus:");
 	if (dev_priv->card_type < NV_10)
 		nouveau_print_bitfield_names(nstatus, nouveau_nstatus_names,
-	                             ARRAY_SIZE(nouveau_nstatus_names));
+					ARRAY_SIZE(nouveau_nstatus_names));
 	else
-		nouveau_print_bitfield_names(nstatus, nouveau_nstatus_names_nv10,
-	                             ARRAY_SIZE(nouveau_nstatus_names_nv10));
+		nouveau_print_bitfield_names(nstatus,
+					nouveau_nstatus_names_nv10,
+					ARRAY_SIZE(nouveau_nstatus_names_nv10));
 	printk("\n");
 
 	NV_INFO(dev, "%s - Ch %d/%d Class 0x%04x Mthd 0x%04x Data 0x%08x:0x%08x\n",
@@ -487,7 +487,7 @@ nouveau_pgraph_intr_context_switch(struct drm_device *dev)
 	chid = engine->fifo.channel_id(dev);
 	NV_DEBUG(dev, "PGRAPH context switch interrupt channel %x\n", chid);
 
-	switch(dev_priv->card_type) {
+	switch (dev_priv->card_type) {
 	case NV_04:
 	case NV_05:
 		nv04_graph_context_switch(dev);
@@ -642,7 +642,7 @@ nouveau_crtc_irq_handler(struct drm_device *dev, int crtc)
 irqreturn_t
 nouveau_irq_handler(DRM_IRQ_ARGS)
 {
-	struct drm_device *dev = (struct drm_device*)arg;
+	struct drm_device *dev = (struct drm_device *)arg;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	uint32_t status;
 

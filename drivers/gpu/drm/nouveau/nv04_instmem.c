@@ -35,22 +35,22 @@ nv04_instmem_determine_amount(struct drm_device *dev)
 		case 0x47:
 		case 0x49:
 		case 0x4b:
-			dev_priv->ramin_rsvd_vram = (2*1024* 1024);
+			dev_priv->ramin_rsvd_vram = (2 * 1024 * 1024);
 			break;
 		default:
-			dev_priv->ramin_rsvd_vram = (1*1024* 1024);
+			dev_priv->ramin_rsvd_vram = (1 * 1024 * 1024);
 			break;
 		}
 	} else {
 		/*XXX: what *are* the limits on <NV40 cards?
 		 */
-		dev_priv->ramin_rsvd_vram = (512*1024);
+		dev_priv->ramin_rsvd_vram = (512 * 1024);
 	}
-	NV_DEBUG(dev, "RAMIN size: %dKiB\n", dev_priv->ramin_rsvd_vram>>10);
+	NV_DEBUG(dev, "RAMIN size: %dKiB\n", dev_priv->ramin_rsvd_vram >> 10);
 
 	/* Clear all of it, except the BIOS image that's in the first 64KiB */
 	dev_priv->engine.instmem.prepare_access(dev, true);
-	for (i=(64*1024); i<dev_priv->ramin_rsvd_vram; i+=4)
+	for (i = 64 * 1024; i < dev_priv->ramin_rsvd_vram; i += 4)
 		nv_wi32(dev, i, 0x00000000);
 	dev_priv->engine.instmem.finish_access(dev);
 }
@@ -84,24 +84,21 @@ nv04_instmem_configure_fixed_tables(struct drm_device *dev)
 	 *           cards.  RAMFC is 4kb (32 fifos, 128byte entries).
 	 *   Others: Position RAMFC at RAMIN+0x11400
 	 */
-	switch(dev_priv->card_type)
-	{
-		case NV_40:
-			dev_priv->ramfc_offset = 0x20000;
-			dev_priv->ramfc_size   = engine->fifo.channels *
-						 nouveau_fifo_ctx_size(dev);
-			break;
-		case NV_30:
-		case NV_20:
-		case NV_17:
-		case NV_11:
-		case NV_10:
-		case NV_04:
-		default:
-			dev_priv->ramfc_offset = 0x11400;
-			dev_priv->ramfc_size   = engine->fifo.channels *
-						 nouveau_fifo_ctx_size(dev);
-			break;
+	dev_priv->ramfc_size = engine->fifo.channels *
+						nouveau_fifo_ctx_size(dev);
+	switch (dev_priv->card_type) {
+	case NV_40:
+		dev_priv->ramfc_offset = 0x20000;
+		break;
+	case NV_30:
+	case NV_20:
+	case NV_17:
+	case NV_11:
+	case NV_10:
+	case NV_04:
+	default:
+		dev_priv->ramfc_offset = 0x11400;
+		break;
 	}
 	NV_DEBUG(dev, "RAMFC offset=0x%x, size=%d\n", dev_priv->ramfc_offset,
 						      dev_priv->ramfc_size);

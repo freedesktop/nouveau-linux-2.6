@@ -26,8 +26,11 @@
 #include "drmP.h"
 #include "nouveau_drv.h"
 
-#define MASK(field) ((0xffffffff >> (31 - ((1?field) - (0?field)))) << (0?field))
-#define XLATE(src, srclowbit, outfield) ((((src) >> (srclowbit)) << (0?outfield)) & MASK(outfield))
+#define MASK(field) ( \
+	(0xffffffff >> (31 - ((1 ? field) - (0 ? field)))) << (0 ? field))
+
+#define XLATE(src, srclowbit, outfield) ( \
+	(((src) >> (srclowbit)) << (0 ? outfield)) & MASK(outfield))
 
 void NVWriteVgaSeq(struct drm_device *, int head, uint8_t index, uint8_t value);
 uint8_t NVReadVgaSeq(struct drm_device *, int head, uint8_t index);
@@ -323,7 +326,7 @@ nv_heads_tied(struct drm_device *dev)
 	if (dev_priv->chipset == 0x11)
 		return !!(nvReadMC(dev, NV_PBUS_DEBUG_1) & (1 << 28));
 
-	return (NVReadVgaCrtc(dev, 0, NV_CIO_CRE_44) & 0x4);
+	return NVReadVgaCrtc(dev, 0, NV_CIO_CRE_44) & 0x4;
 }
 
 /* makes cr0-7 on the specified head read-only */
@@ -346,14 +349,14 @@ static inline void
 nv_lock_vga_crtc_shadow(struct drm_device *dev, int head, int lock)
 {
 	/* shadow lock: connects 0x60?3d? regs to "real" 0x3d? regs
-         * bit7: unlocks HDT, HBS, HBE, HRS, HRE, HEB
-         * bit6: seems to have some effect on CR09 (double scan, VBS_9)
-         * bit5: unlocks HDE
-         * bit4: unlocks VDE
-         * bit3: unlocks VDT, OVL, VRS, ?VRE?, VBS, VBE, LSR, EBR
-         * bit2: same as bit 1 of 0x60?804
-         * bit0: same as bit 0 of 0x60?804
-         */
+	 * bit7: unlocks HDT, HBS, HBE, HRS, HRE, HEB
+	 * bit6: seems to have some effect on CR09 (double scan, VBS_9)
+	 * bit5: unlocks HDE
+	 * bit4: unlocks VDE
+	 * bit3: unlocks VDT, OVL, VRS, ?VRE?, VBS, VBE, LSR, EBR
+	 * bit2: same as bit 1 of 0x60?804
+	 * bit0: same as bit 0 of 0x60?804
+	 */
 
 	uint8_t cr21 = lock;
 

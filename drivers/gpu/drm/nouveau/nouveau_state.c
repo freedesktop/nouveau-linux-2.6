@@ -43,34 +43,34 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 
 	switch (dev_priv->chipset & 0xf0) {
 	case 0x00:
-		engine->instmem.init	= nv04_instmem_init;
-		engine->instmem.takedown= nv04_instmem_takedown;
-		engine->instmem.suspend	= nv04_instmem_suspend;
-		engine->instmem.resume	= nv04_instmem_resume;
+		engine->instmem.init		= nv04_instmem_init;
+		engine->instmem.takedown	= nv04_instmem_takedown;
+		engine->instmem.suspend		= nv04_instmem_suspend;
+		engine->instmem.resume		= nv04_instmem_resume;
 		engine->instmem.populate	= nv04_instmem_populate;
 		engine->instmem.clear		= nv04_instmem_clear;
 		engine->instmem.bind		= nv04_instmem_bind;
 		engine->instmem.unbind		= nv04_instmem_unbind;
 		engine->instmem.prepare_access	= nv04_instmem_prepare_access;
 		engine->instmem.finish_access	= nv04_instmem_finish_access;
-		engine->mc.init		= nv04_mc_init;
-		engine->mc.takedown	= nv04_mc_takedown;
-		engine->timer.init	= nv04_timer_init;
-		engine->timer.read	= nv04_timer_read;
-		engine->timer.takedown	= nv04_timer_takedown;
-		engine->fb.init		= nv04_fb_init;
-		engine->fb.takedown	= nv04_fb_takedown;
-		engine->graph.grclass	= nv04_graph_grclass;
-		engine->graph.init	= nv04_graph_init;
-		engine->graph.takedown	= nv04_graph_takedown;
+		engine->mc.init			= nv04_mc_init;
+		engine->mc.takedown		= nv04_mc_takedown;
+		engine->timer.init		= nv04_timer_init;
+		engine->timer.read		= nv04_timer_read;
+		engine->timer.takedown		= nv04_timer_takedown;
+		engine->fb.init			= nv04_fb_init;
+		engine->fb.takedown		= nv04_fb_takedown;
+		engine->graph.grclass		= nv04_graph_grclass;
+		engine->graph.init		= nv04_graph_init;
+		engine->graph.takedown		= nv04_graph_takedown;
 		engine->graph.fifo_access	= nv04_graph_fifo_access;
 		engine->graph.create_context	= nv04_graph_create_context;
 		engine->graph.destroy_context	= nv04_graph_destroy_context;
 		engine->graph.load_context	= nv04_graph_load_context;
 		engine->graph.save_context	= nv04_graph_save_context;
-		engine->fifo.channels	= 16;
-		engine->fifo.init	= nv04_fifo_init;
-		engine->fifo.takedown	= nouveau_stub_takedown;
+		engine->fifo.channels		= 16;
+		engine->fifo.init		= nv04_fifo_init;
+		engine->fifo.takedown		= nouveau_stub_takedown;
 		engine->fifo.channel_id		= nv04_fifo_channel_id;
 		engine->fifo.create_context	= nv04_fifo_create_context;
 		engine->fifo.destroy_context	= nv04_fifo_destroy_context;
@@ -78,34 +78,34 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fifo.save_context	= nv04_fifo_save_context;
 		break;
 	case 0x10:
-		engine->instmem.init	= nv04_instmem_init;
-		engine->instmem.takedown= nv04_instmem_takedown;
-		engine->instmem.suspend	= nv04_instmem_suspend;
-		engine->instmem.resume	= nv04_instmem_resume;
+		engine->instmem.init		= nv04_instmem_init;
+		engine->instmem.takedown	= nv04_instmem_takedown;
+		engine->instmem.suspend		= nv04_instmem_suspend;
+		engine->instmem.resume		= nv04_instmem_resume;
 		engine->instmem.populate	= nv04_instmem_populate;
 		engine->instmem.clear		= nv04_instmem_clear;
 		engine->instmem.bind		= nv04_instmem_bind;
 		engine->instmem.unbind		= nv04_instmem_unbind;
 		engine->instmem.prepare_access	= nv04_instmem_prepare_access;
 		engine->instmem.finish_access	= nv04_instmem_finish_access;
-		engine->mc.init		= nv04_mc_init;
-		engine->mc.takedown	= nv04_mc_takedown;
-		engine->timer.init	= nv04_timer_init;
-		engine->timer.read	= nv04_timer_read;
-		engine->timer.takedown	= nv04_timer_takedown;
-		engine->fb.init		= nv10_fb_init;
-		engine->fb.takedown	= nv10_fb_takedown;
-		engine->graph.grclass	= nv10_graph_grclass;
-		engine->graph.init	= nv10_graph_init;
-		engine->graph.takedown	= nv10_graph_takedown;
+		engine->mc.init			= nv04_mc_init;
+		engine->mc.takedown		= nv04_mc_takedown;
+		engine->timer.init		= nv04_timer_init;
+		engine->timer.read		= nv04_timer_read;
+		engine->timer.takedown		= nv04_timer_takedown;
+		engine->fb.init			= nv10_fb_init;
+		engine->fb.takedown		= nv10_fb_takedown;
+		engine->graph.grclass		= nv10_graph_grclass;
+		engine->graph.init		= nv10_graph_init;
+		engine->graph.takedown		= nv10_graph_takedown;
 		engine->graph.create_context	= nv10_graph_create_context;
 		engine->graph.destroy_context	= nv10_graph_destroy_context;
 		engine->graph.fifo_access	= nv04_graph_fifo_access;
 		engine->graph.load_context	= nv10_graph_load_context;
 		engine->graph.save_context	= nv10_graph_save_context;
-		engine->fifo.channels	= 32;
-		engine->fifo.init	= nv04_fifo_init;
-		engine->fifo.takedown	= nouveau_stub_takedown;
+		engine->fifo.channels		= 32;
+		engine->fifo.init		= nv04_fifo_init;
+		engine->fifo.takedown		= nouveau_stub_takedown;
 		engine->fifo.channel_id		= nv10_fifo_channel_id;
 		engine->fifo.create_context	= nv10_fifo_create_context;
 		engine->fifo.destroy_context	= nv10_fifo_destroy_context;
@@ -113,34 +113,34 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fifo.save_context	= nv10_fifo_save_context;
 		break;
 	case 0x20:
-		engine->instmem.init	= nv04_instmem_init;
-		engine->instmem.takedown= nv04_instmem_takedown;
-		engine->instmem.suspend	= nv04_instmem_suspend;
-		engine->instmem.resume	= nv04_instmem_resume;
+		engine->instmem.init		= nv04_instmem_init;
+		engine->instmem.takedown	= nv04_instmem_takedown;
+		engine->instmem.suspend		= nv04_instmem_suspend;
+		engine->instmem.resume		= nv04_instmem_resume;
 		engine->instmem.populate	= nv04_instmem_populate;
 		engine->instmem.clear		= nv04_instmem_clear;
 		engine->instmem.bind		= nv04_instmem_bind;
 		engine->instmem.unbind		= nv04_instmem_unbind;
 		engine->instmem.prepare_access	= nv04_instmem_prepare_access;
 		engine->instmem.finish_access	= nv04_instmem_finish_access;
-		engine->mc.init		= nv04_mc_init;
-		engine->mc.takedown	= nv04_mc_takedown;
-		engine->timer.init	= nv04_timer_init;
-		engine->timer.read	= nv04_timer_read;
-		engine->timer.takedown	= nv04_timer_takedown;
-		engine->fb.init		= nv10_fb_init;
-		engine->fb.takedown	= nv10_fb_takedown;
-		engine->graph.grclass	= nv20_graph_grclass;
-		engine->graph.init	= nv20_graph_init;
-		engine->graph.takedown	= nv20_graph_takedown;
+		engine->mc.init			= nv04_mc_init;
+		engine->mc.takedown		= nv04_mc_takedown;
+		engine->timer.init		= nv04_timer_init;
+		engine->timer.read		= nv04_timer_read;
+		engine->timer.takedown		= nv04_timer_takedown;
+		engine->fb.init			= nv10_fb_init;
+		engine->fb.takedown		= nv10_fb_takedown;
+		engine->graph.grclass		= nv20_graph_grclass;
+		engine->graph.init		= nv20_graph_init;
+		engine->graph.takedown		= nv20_graph_takedown;
 		engine->graph.create_context	= nv20_graph_create_context;
 		engine->graph.destroy_context	= nv20_graph_destroy_context;
 		engine->graph.fifo_access	= nv04_graph_fifo_access;
 		engine->graph.load_context	= nv20_graph_load_context;
 		engine->graph.save_context	= nv20_graph_save_context;
-		engine->fifo.channels	= 32;
-		engine->fifo.init	= nv04_fifo_init;
-		engine->fifo.takedown	= nouveau_stub_takedown;
+		engine->fifo.channels		= 32;
+		engine->fifo.init		= nv04_fifo_init;
+		engine->fifo.takedown		= nouveau_stub_takedown;
 		engine->fifo.channel_id		= nv10_fifo_channel_id;
 		engine->fifo.create_context	= nv10_fifo_create_context;
 		engine->fifo.destroy_context	= nv10_fifo_destroy_context;
@@ -148,34 +148,34 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fifo.save_context	= nv10_fifo_save_context;
 		break;
 	case 0x30:
-		engine->instmem.init	= nv04_instmem_init;
-		engine->instmem.takedown= nv04_instmem_takedown;
-		engine->instmem.suspend	= nv04_instmem_suspend;
-		engine->instmem.resume	= nv04_instmem_resume;
+		engine->instmem.init		= nv04_instmem_init;
+		engine->instmem.takedown	= nv04_instmem_takedown;
+		engine->instmem.suspend		= nv04_instmem_suspend;
+		engine->instmem.resume		= nv04_instmem_resume;
 		engine->instmem.populate	= nv04_instmem_populate;
 		engine->instmem.clear		= nv04_instmem_clear;
 		engine->instmem.bind		= nv04_instmem_bind;
 		engine->instmem.unbind		= nv04_instmem_unbind;
 		engine->instmem.prepare_access	= nv04_instmem_prepare_access;
 		engine->instmem.finish_access	= nv04_instmem_finish_access;
-		engine->mc.init		= nv04_mc_init;
-		engine->mc.takedown	= nv04_mc_takedown;
-		engine->timer.init	= nv04_timer_init;
-		engine->timer.read	= nv04_timer_read;
-		engine->timer.takedown	= nv04_timer_takedown;
-		engine->fb.init		= nv10_fb_init;
-		engine->fb.takedown	= nv10_fb_takedown;
-		engine->graph.grclass	= nv30_graph_grclass;
-		engine->graph.init	= nv30_graph_init;
-		engine->graph.takedown	= nv20_graph_takedown;
+		engine->mc.init			= nv04_mc_init;
+		engine->mc.takedown		= nv04_mc_takedown;
+		engine->timer.init		= nv04_timer_init;
+		engine->timer.read		= nv04_timer_read;
+		engine->timer.takedown		= nv04_timer_takedown;
+		engine->fb.init			= nv10_fb_init;
+		engine->fb.takedown		= nv10_fb_takedown;
+		engine->graph.grclass		= nv30_graph_grclass;
+		engine->graph.init		= nv30_graph_init;
+		engine->graph.takedown		= nv20_graph_takedown;
 		engine->graph.fifo_access	= nv04_graph_fifo_access;
 		engine->graph.create_context	= nv20_graph_create_context;
 		engine->graph.destroy_context	= nv20_graph_destroy_context;
 		engine->graph.load_context	= nv20_graph_load_context;
 		engine->graph.save_context	= nv20_graph_save_context;
-		engine->fifo.channels	= 32;
-		engine->fifo.init	= nv04_fifo_init;
-		engine->fifo.takedown	= nouveau_stub_takedown;
+		engine->fifo.channels		= 32;
+		engine->fifo.init		= nv04_fifo_init;
+		engine->fifo.takedown		= nouveau_stub_takedown;
 		engine->fifo.channel_id		= nv10_fifo_channel_id;
 		engine->fifo.create_context	= nv10_fifo_create_context;
 		engine->fifo.destroy_context	= nv10_fifo_destroy_context;
@@ -184,34 +184,34 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		break;
 	case 0x40:
 	case 0x60:
-		engine->instmem.init	= nv04_instmem_init;
-		engine->instmem.takedown= nv04_instmem_takedown;
-		engine->instmem.suspend	= nv04_instmem_suspend;
-		engine->instmem.resume	= nv04_instmem_resume;
+		engine->instmem.init		= nv04_instmem_init;
+		engine->instmem.takedown	= nv04_instmem_takedown;
+		engine->instmem.suspend		= nv04_instmem_suspend;
+		engine->instmem.resume		= nv04_instmem_resume;
 		engine->instmem.populate	= nv04_instmem_populate;
 		engine->instmem.clear		= nv04_instmem_clear;
 		engine->instmem.bind		= nv04_instmem_bind;
 		engine->instmem.unbind		= nv04_instmem_unbind;
 		engine->instmem.prepare_access	= nv04_instmem_prepare_access;
 		engine->instmem.finish_access	= nv04_instmem_finish_access;
-		engine->mc.init		= nv40_mc_init;
-		engine->mc.takedown	= nv40_mc_takedown;
-		engine->timer.init	= nv04_timer_init;
-		engine->timer.read	= nv04_timer_read;
-		engine->timer.takedown	= nv04_timer_takedown;
-		engine->fb.init		= nv40_fb_init;
-		engine->fb.takedown	= nv40_fb_takedown;
-		engine->graph.grclass	= nv40_graph_grclass;
-		engine->graph.init	= nv40_graph_init;
-		engine->graph.takedown	= nv40_graph_takedown;
+		engine->mc.init			= nv40_mc_init;
+		engine->mc.takedown		= nv40_mc_takedown;
+		engine->timer.init		= nv04_timer_init;
+		engine->timer.read		= nv04_timer_read;
+		engine->timer.takedown		= nv04_timer_takedown;
+		engine->fb.init			= nv40_fb_init;
+		engine->fb.takedown		= nv40_fb_takedown;
+		engine->graph.grclass		= nv40_graph_grclass;
+		engine->graph.init		= nv40_graph_init;
+		engine->graph.takedown		= nv40_graph_takedown;
 		engine->graph.fifo_access	= nv04_graph_fifo_access;
 		engine->graph.create_context	= nv40_graph_create_context;
 		engine->graph.destroy_context	= nv40_graph_destroy_context;
 		engine->graph.load_context	= nv40_graph_load_context;
 		engine->graph.save_context	= nv40_graph_save_context;
-		engine->fifo.channels	= 32;
-		engine->fifo.init	= nv40_fifo_init;
-		engine->fifo.takedown	= nouveau_stub_takedown;
+		engine->fifo.channels		= 32;
+		engine->fifo.init		= nv40_fifo_init;
+		engine->fifo.takedown		= nouveau_stub_takedown;
 		engine->fifo.channel_id		= nv10_fifo_channel_id;
 		engine->fifo.create_context	= nv40_fifo_create_context;
 		engine->fifo.destroy_context	= nv40_fifo_destroy_context;
@@ -222,34 +222,34 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 	case 0x80: /* gotta love NVIDIA's consistency.. */
 	case 0x90:
 	case 0xA0:
-		engine->instmem.init	= nv50_instmem_init;
-		engine->instmem.takedown= nv50_instmem_takedown;
-		engine->instmem.suspend	= nv50_instmem_suspend;
-		engine->instmem.resume	= nv50_instmem_resume;
+		engine->instmem.init		= nv50_instmem_init;
+		engine->instmem.takedown	= nv50_instmem_takedown;
+		engine->instmem.suspend		= nv50_instmem_suspend;
+		engine->instmem.resume		= nv50_instmem_resume;
 		engine->instmem.populate	= nv50_instmem_populate;
 		engine->instmem.clear		= nv50_instmem_clear;
 		engine->instmem.bind		= nv50_instmem_bind;
 		engine->instmem.unbind		= nv50_instmem_unbind;
 		engine->instmem.prepare_access	= nv50_instmem_prepare_access;
 		engine->instmem.finish_access	= nv50_instmem_finish_access;
-		engine->mc.init		= nv50_mc_init;
-		engine->mc.takedown	= nv50_mc_takedown;
-		engine->timer.init	= nv04_timer_init;
-		engine->timer.read	= nv04_timer_read;
-		engine->timer.takedown	= nv04_timer_takedown;
-		engine->fb.init		= nouveau_stub_init;
-		engine->fb.takedown	= nouveau_stub_takedown;
-		engine->graph.grclass	= nv50_graph_grclass;
-		engine->graph.init	= nv50_graph_init;
-		engine->graph.takedown	= nv50_graph_takedown;
+		engine->mc.init			= nv50_mc_init;
+		engine->mc.takedown		= nv50_mc_takedown;
+		engine->timer.init		= nv04_timer_init;
+		engine->timer.read		= nv04_timer_read;
+		engine->timer.takedown		= nv04_timer_takedown;
+		engine->fb.init			= nouveau_stub_init;
+		engine->fb.takedown		= nouveau_stub_takedown;
+		engine->graph.grclass		= nv50_graph_grclass;
+		engine->graph.init		= nv50_graph_init;
+		engine->graph.takedown		= nv50_graph_takedown;
 		engine->graph.fifo_access	= nv50_graph_fifo_access;
 		engine->graph.create_context	= nv50_graph_create_context;
 		engine->graph.destroy_context	= nv50_graph_destroy_context;
 		engine->graph.load_context	= nv50_graph_load_context;
 		engine->graph.save_context	= nv50_graph_save_context;
-		engine->fifo.channels	= 128;
-		engine->fifo.init	= nv50_fifo_init;
-		engine->fifo.takedown	= nv50_fifo_takedown;
+		engine->fifo.channels		= 128;
+		engine->fifo.init		= nv50_fifo_init;
+		engine->fifo.takedown		= nv50_fifo_takedown;
 		engine->fifo.channel_id		= nv50_fifo_channel_id;
 		engine->fifo.create_context	= nv50_fifo_create_context;
 		engine->fifo.destroy_context	= nv50_fifo_destroy_context;
@@ -286,7 +286,8 @@ nouveau_card_init(struct drm_device *dev)
 
 	/* Initialise internal driver API hooks */
 	ret = nouveau_init_engine_ptrs(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 	engine = &dev_priv->engine;
 	dev_priv->init_state = NOUVEAU_CARD_INIT_FAILED;
 
@@ -298,64 +299,77 @@ nouveau_card_init(struct drm_device *dev)
 	}
 
 	ret = nouveau_gpuobj_early_init(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	/* Initialise instance memory, must happen before mem_init so we
 	 * know exactly how much VRAM we're able to use for "normal"
 	 * purposes.
 	 */
 	ret = engine->instmem.init(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	/* Setup the memory manager */
 	ret = nouveau_mem_init(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	ret = nouveau_gpuobj_init(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	/* PMC */
 	ret = engine->mc.init(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	/* PTIMER */
 	ret = engine->timer.init(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	/* PFB */
 	ret = engine->fb.init(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	/* PGRAPH */
 	ret = engine->graph.init(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	/* PFIFO */
 	ret = engine->fifo.init(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	/* this call irq_preinstall, register irq handler and
 	 * call irq_postinstall
 	 */
 	ret = drm_irq_install(dev);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	ret = drm_vblank_init(dev, 0);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	/* what about PVIDEO/PCRTC/PRAMDAC etc? */
 
 	ret = nouveau_channel_alloc(dev, &dev_priv->channel,
 				    (struct drm_file *)-2,
 				    NvDmaFB, NvDmaTT);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	gpuobj = NULL;
 	ret = nouveau_gpuobj_dma_new(dev_priv->channel, NV_CLASS_DMA_IN_MEMORY,
 				     0, nouveau_mem_fb_amount(dev),
 				     NV_DMA_ACCESS_RW, NV_DMA_TARGET_VIDMEM,
 				     &gpuobj);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	ret = nouveau_gpuobj_ref_add(dev, dev_priv->channel, NvDmaVRAM,
 				     gpuobj, NULL);
@@ -368,7 +382,8 @@ nouveau_card_init(struct drm_device *dev)
 	ret = nouveau_gpuobj_gart_dma_new(dev_priv->channel, 0,
 					  dev_priv->gart_info.aper_size,
 					  NV_DMA_ACCESS_RW, &gpuobj, NULL);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	ret = nouveau_gpuobj_ref_add(dev, dev_priv->channel, NvDmaGART,
 				     gpuobj, NULL);
@@ -530,7 +545,7 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	reg0 = nv_rd32(dev, NV03_PMC_BOOT_0);
 
 	/* We're dealing with >=NV10 */
-	if ((reg0 & 0x0f000000) > 0 ) {
+	if ((reg0 & 0x0f000000) > 0) {
 		/* Bit 27-20 contain the architecture in hex */
 		architecture = (reg0 & 0xff00000) >> 20;
 	/* NV04 or NV05 */
@@ -599,11 +614,10 @@ int nouveau_load(struct drm_device *dev, unsigned long flags)
 	nouveau_OF_copy_vbios_to_ramin(dev);
 
 	/* Special flags */
-	if (dev->pci_device == 0x01a0) {
+	if (dev->pci_device == 0x01a0)
 		dev_priv->flags |= NV_NFORCE;
-	} else if (dev->pci_device == 0x01f0) {
+	else if (dev->pci_device == 0x01f0)
 		dev_priv->flags |= NV_NFORCE2;
-	}
 
 	/* For kernel modesetting, init card now and bring up fbcon */
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
@@ -660,7 +674,8 @@ nouveau_ioctl_card_init(struct drm_device *dev, void *data,
 	return nouveau_card_init(dev);
 }
 
-int nouveau_ioctl_getparam(struct drm_device *dev, void *data, struct drm_file *file_priv)
+int nouveau_ioctl_getparam(struct drm_device *dev, void *data,
+						struct drm_file *file_priv)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct drm_nouveau_getparam *getparam = data;
@@ -672,40 +687,39 @@ int nouveau_ioctl_getparam(struct drm_device *dev, void *data, struct drm_file *
 		getparam->value = dev_priv->chipset;
 		break;
 	case NOUVEAU_GETPARAM_PCI_VENDOR:
-		getparam->value=dev->pci_vendor;
+		getparam->value = dev->pci_vendor;
 		break;
 	case NOUVEAU_GETPARAM_PCI_DEVICE:
-		getparam->value=dev->pci_device;
+		getparam->value = dev->pci_device;
 		break;
 	case NOUVEAU_GETPARAM_BUS_TYPE:
 		if (drm_device_is_agp(dev))
-			getparam->value=NV_AGP;
+			getparam->value = NV_AGP;
 		else if (drm_device_is_pcie(dev))
-			getparam->value=NV_PCIE;
+			getparam->value = NV_PCIE;
 		else
-			getparam->value=NV_PCI;
+			getparam->value = NV_PCI;
 		break;
 	case NOUVEAU_GETPARAM_FB_PHYSICAL:
-		getparam->value=dev_priv->fb_phys;
+		getparam->value = dev_priv->fb_phys;
 		break;
 	case NOUVEAU_GETPARAM_AGP_PHYSICAL:
-		getparam->value=dev_priv->gart_info.aper_base;
+		getparam->value = dev_priv->gart_info.aper_base;
 		break;
 	case NOUVEAU_GETPARAM_PCI_PHYSICAL:
-		if ( dev -> sg )
-			getparam->value=(unsigned long)dev->sg->virtual;
-		else
-		     {
-		     NV_ERROR(dev, "Requested PCIGART address, "
-				   "while no PCIGART was created\n");
-		     return -EINVAL;
-		     }
+		if (dev->sg) {
+			getparam->value = (unsigned long)dev->sg->virtual;
+		} else {
+			NV_ERROR(dev, "Requested PCIGART address, "
+					"while no PCIGART was created\n");
+			return -EINVAL;
+		}
 		break;
 	case NOUVEAU_GETPARAM_FB_SIZE:
-		getparam->value=dev_priv->fb_available_size;
+		getparam->value = dev_priv->fb_available_size;
 		break;
 	case NOUVEAU_GETPARAM_AGP_SIZE:
-		getparam->value=dev_priv->gart_info.aper_size;
+		getparam->value = dev_priv->gart_info.aper_size;
 		break;
 	case NOUVEAU_GETPARAM_VM_VRAM_BASE:
 		getparam->value = dev_priv->vm_vram_base;

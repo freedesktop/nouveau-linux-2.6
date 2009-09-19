@@ -233,10 +233,11 @@ nouveau_sgdma_init(struct drm_device *dev)
 		obj_size  = (aper_size >> NV_CTXDMA_PAGE_SHIFT) * 8;
 	}
 
-	if ((ret = nouveau_gpuobj_new(dev, NULL, obj_size, 16,
+	ret = nouveau_gpuobj_new(dev, NULL, obj_size, 16,
 				      NVOBJ_FLAG_ALLOW_NO_REFS |
 				      NVOBJ_FLAG_ZERO_ALLOC |
-				      NVOBJ_FLAG_ZERO_FREE, &gpuobj)))  {
+				      NVOBJ_FLAG_ZERO_FREE, &gpuobj);
+	if (ret) {
 		NV_ERROR(dev, "Error creating sgdma object: %d\n", ret);
 		return ret;
 	}
@@ -259,12 +260,12 @@ nouveau_sgdma_init(struct drm_device *dev)
 				       (NV_DMA_ACCESS_RW  << 14) |
 				       (NV_DMA_TARGET_PCI << 16));
 		nv_wo32(dev, gpuobj, 1, aper_size - 1);
-		for (i=2; i<2+(aper_size>>12); i++) {
+		for (i = 2; i < 2 + (aper_size >> 12); i++) {
 			nv_wo32(dev, gpuobj, i,
 				    dev_priv->gart_info.sg_dummy_bus | 3);
 		}
 	} else {
-		for (i=0; i<obj_size; i+=8) {
+		for (i = 0; i < obj_size; i += 8) {
 			nv_wo32(dev, gpuobj, (i+0)/4,
 				    dev_priv->gart_info.sg_dummy_bus | 0x21);
 			nv_wo32(dev, gpuobj, (i+4)/4, 0);

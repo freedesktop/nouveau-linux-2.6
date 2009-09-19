@@ -223,7 +223,7 @@ enum drm_connector_status nv17_dac_detect(struct drm_encoder *encoder,
 		saved_rtest_ctrl, temp, saved_gpio_ext = 0, routput;
 	int head, present = 0;
 
-#define RGB_TEST_DATA(r,g,b) (r << 0 | g << 10 | b << 20)
+#define RGB_TEST_DATA(r, g, b) (r << 0 | g << 10 | b << 20)
 	if (dcb->type == OUTPUT_TV) {
 		testval = RGB_TEST_DATA(0xa0, 0xa0, 0xa0);
 
@@ -417,8 +417,12 @@ void nv04_dac_update_dacclk(struct drm_encoder *encoder, bool enable)
 			*dac_users |= 1 << dcb->index;
 			NVWriteRAMDAC(dev, 0, dacclk_off, dacclk | NV_PRAMDAC_DACCLK_SEL_DACCLK);
 
-		} else if (!(*dac_users &= ~(1 << dcb->index)))
-			NVWriteRAMDAC(dev, 0, dacclk_off, dacclk & ~NV_PRAMDAC_DACCLK_SEL_DACCLK);
+		} else {
+			*dac_users &= ~(1 << dcb->index);
+			if (!*dac_users)
+				NVWriteRAMDAC(dev, 0, dacclk_off,
+					dacclk & ~NV_PRAMDAC_DACCLK_SEL_DACCLK);
+		}
 	}
 }
 

@@ -42,7 +42,7 @@ struct pipe_state {
 	uint32_t pipe_0x7800[0x0c0/4];
 };
 
-static int nv10_graph_ctx_regs [] = {
+static int nv10_graph_ctx_regs[] = {
 NV10_PGRAPH_CTX_SWITCH1,
 NV10_PGRAPH_CTX_SWITCH2,
 NV10_PGRAPH_CTX_SWITCH3,
@@ -364,7 +364,7 @@ NV04_PGRAPH_VALID1,
 NV04_PGRAPH_VALID2,
 };
 
-static int nv17_graph_ctx_regs [] = {
+static int nv17_graph_ctx_regs[] = {
 NV10_PGRAPH_DEBUG_4,
 0x004006b0,
 0x00400eac,
@@ -391,9 +391,10 @@ struct graph_state {
 	struct pipe_state pipe_state;
 };
 
-static void nv10_graph_save_pipe(struct nouveau_channel *chan) {
+static void nv10_graph_save_pipe(struct nouveau_channel *chan)
+{
 	struct drm_device *dev = chan->dev;
-	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
+	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
 	struct pipe_state *fifo_pipe_state = &pgraph_ctx->pipe_state;
 	int i;
 #define PIPE_SAVE(addr) \
@@ -417,9 +418,10 @@ static void nv10_graph_save_pipe(struct nouveau_channel *chan) {
 #undef PIPE_SAVE
 }
 
-static void nv10_graph_load_pipe(struct nouveau_channel *chan) {
+static void nv10_graph_load_pipe(struct nouveau_channel *chan)
+{
 	struct drm_device *dev = chan->dev;
-	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
+	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
 	struct pipe_state *fifo_pipe_state = &pgraph_ctx->pipe_state;
 	int i;
 	uint32_t xfmode0, xfmode1;
@@ -475,9 +477,10 @@ static void nv10_graph_load_pipe(struct nouveau_channel *chan) {
 #undef PIPE_RESTORE
 }
 
-static void nv10_graph_create_pipe(struct nouveau_channel *chan) {
+static void nv10_graph_create_pipe(struct nouveau_channel *chan)
+{
 	struct drm_device *dev = chan->dev;
-	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
+	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
 	struct pipe_state *fifo_pipe_state = &pgraph_ctx->pipe_state;
 	uint32_t *fifo_pipe_state_addr;
 	int i;
@@ -655,7 +658,7 @@ int nv10_graph_load_context(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
+	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(nv10_graph_ctx_regs); i++)
@@ -675,7 +678,7 @@ int nv10_graph_save_context(struct nouveau_channel *chan)
 {
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
+	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(nv10_graph_ctx_regs); i++)
@@ -731,7 +734,7 @@ void nv10_graph_context_switch(struct drm_device *dev)
 			next->id);
 	} else {
 		NV_DEBUG(dev, "NV: PGRAPH context switch interrupt channel %x -> %x\n",
-		         last->id, next->id);
+							last->id, next->id);
 	}
 
 	nv_wr32(dev, NV04_PGRAPH_FIFO, 0x0);
@@ -766,10 +769,11 @@ void nv10_graph_context_switch(struct drm_device *dev)
 		pgraph_ctx->nv17[offset] = val; \
 	} while (0)
 
-int nv10_graph_create_context(struct nouveau_channel *chan) {
+int nv10_graph_create_context(struct nouveau_channel *chan)
+{
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct graph_state* pgraph_ctx;
+	struct graph_state *pgraph_ctx;
 
 	NV_DEBUG(dev, "nv10_graph_context_create %d\n", chan->id);
 
@@ -814,7 +818,7 @@ int nv10_graph_create_context(struct nouveau_channel *chan) {
 	NV_WRITE_CTX(0x00400e14, 0x00001000);
 	NV_WRITE_CTX(0x00400e30, 0x00080008);
 	NV_WRITE_CTX(0x00400e34, 0x00080008);
-	if (dev_priv->chipset>=0x17) {
+	if (dev_priv->chipset >= 0x17) {
 		/* is it really needed ??? */
 		NV17_WRITE_CTX(NV10_PGRAPH_DEBUG_4,
 					nv_rd32(dev, NV10_PGRAPH_DEBUG_4));
@@ -835,7 +839,7 @@ void nv10_graph_destroy_context(struct nouveau_channel *chan)
 	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_engine *engine = &dev_priv->engine;
-	struct graph_state* pgraph_ctx = chan->pgraph_ctx;
+	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
 	int chid;
 
 	kfree(pgraph_ctx);
@@ -855,19 +859,21 @@ void nv10_graph_destroy_context(struct nouveau_channel *chan)
 		NV_INFO(dev, "cleanning a channel with graph in current context\n");
 		nouveau_wait_for_idle(dev);
 		NV_INFO(dev, "reseting current graph context\n");
-		/* can't be call here because of dynamic mem alloc */
-		//nv10_graph_create_context(chan);
+		/*
+		 * can't be call here because of dynamic mem alloc
+		 * nv10_graph_create_context(chan);
+		 */
 		nv10_graph_load_context(chan);
 	}
 	nv_wr32(dev, NV04_PGRAPH_FIFO, 0x1);
 #else
-	if (chid == chan->id) {
+	if (chid == chan->id)
 		NV_INFO(dev, "cleaning a channel with graph in current context\n");
-	}
 #endif
 }
 
-int nv10_graph_init(struct drm_device *dev) {
+int nv10_graph_init(struct drm_device *dev)
+{
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	int i;
 
@@ -887,15 +893,14 @@ int nv10_graph_init(struct drm_device *dev) {
 	nv_wr32(dev, NV04_PGRAPH_DEBUG_3, 0x55DE0830 |
 				      (1<<29) |
 				      (1<<31));
-	if (dev_priv->chipset>=0x17) {
+	if (dev_priv->chipset >= 0x17) {
 		nv_wr32(dev, NV10_PGRAPH_DEBUG_4, 0x1f000000);
 		nv_wr32(dev, 0x004006b0, 0x40000020);
-	}
-	else
+	} else
 		nv_wr32(dev, NV10_PGRAPH_DEBUG_4, 0x00000000);
 
 	/* copy tile info from PFB */
-	for (i=0; i<NV10_PFB_TILE__SIZE; i++) {
+	for (i = 0; i < NV10_PFB_TILE__SIZE; i++) {
 		nv_wr32(dev, NV10_PGRAPH_TILE(i),
 					nv_rd32(dev, NV10_PFB_TILE(i)));
 		nv_wr32(dev, NV10_PGRAPH_TLIMIT(i),
