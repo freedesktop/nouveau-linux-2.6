@@ -1439,6 +1439,29 @@ nv4e_graph_context_init(struct drm_device *dev, struct nouveau_gpuobj *ctx)
 		nv_wo32(dev, ctx, i/4, 0x3f800000);
 }
 
+struct nouveau_channel *
+nv40_graph_channel(struct drm_device *dev)
+{
+	struct drm_nouveau_private *dev_priv = dev->dev_private;
+	uint32_t inst;
+	int i;
+
+	inst = nv_rd32(dev, NV40_PGRAPH_CTXCTL_CUR);
+	if (!(inst & NV40_PGRAPH_CTXCTL_CUR_LOADED))
+		return NULL;
+	inst = (inst & NV40_PGRAPH_CTXCTL_CUR_INSTANCE) << 4;
+
+	for (i = 0; i < dev_priv->engine.fifo.channels; i++) {
+		struct nouveau_channel *chan = dev_priv->fifos[i];
+
+		if (chan && chan->ramin_grctx &&
+		    chan->ramin_grctx->instance == inst)
+			return chan;
+	}
+
+	return NULL;
+}
+
 int
 nv40_graph_create_context(struct nouveau_channel *chan)
 {
@@ -1622,7 +1645,7 @@ nv40_graph_load_context(struct nouveau_channel *chan)
  * and PGRAPH during a context switch.  We're currently using values seen
  * in mmio-traces of the binary driver.
  */
-static uint32_t nv40_ctx_prog[] = {
+static uint32_t nv40_ctxprog[] = {
 	0x00400889, 0x00200000, 0x0060000a, 0x00200000, 0x00300000, 0x00800001,
 	0x00700009, 0x0060000e, 0x00400d64, 0x00400d05, 0x00408f65, 0x00409406,
 	0x0040a268, 0x00200000, 0x0060000a, 0x00700000, 0x00106000, 0x00700080,
@@ -1654,7 +1677,7 @@ static uint32_t nv40_ctx_prog[] = {
 	~0
 };
 
-static uint32_t nv41_ctx_prog[] = {
+static uint32_t nv41_ctxprog[] = {
 	0x00400889, 0x00200000, 0x0060000a, 0x00200000, 0x00300000, 0x00800001,
 	0x00700009, 0x0060000e, 0x00400d64, 0x00400d05, 0x00408f65, 0x00409306,
 	0x0040a068, 0x0040198f, 0x00200001, 0x0060000a, 0x00700080, 0x00104042,
@@ -1685,7 +1708,7 @@ static uint32_t nv41_ctx_prog[] = {
 	0x00600009, 0x00700005, 0x00700006, 0x0060000e, ~0
 };
 
-static uint32_t nv43_ctx_prog[] = {
+static uint32_t nv43_ctxprog[] = {
 	0x00400889, 0x00200000, 0x0060000a, 0x00200000, 0x00300000, 0x00800001,
 	0x00700009, 0x0060000e, 0x00400d64, 0x00400d05, 0x00409565, 0x00409a06,
 	0x0040a868, 0x00200000, 0x0060000a, 0x00700000, 0x00106000, 0x00700080,
@@ -1718,7 +1741,7 @@ static uint32_t nv43_ctx_prog[] = {
 	~0
 };
 
-static uint32_t nv44_ctx_prog[] = {
+static uint32_t nv44_ctxprog[] = {
 	0x00400889, 0x00200000, 0x0060000a, 0x00200000, 0x00300000, 0x00800001,
 	0x00700009, 0x0060000e, 0x00400d64, 0x00400d05, 0x00409a65, 0x00409f06,
 	0x0040ac68, 0x0040248f, 0x00200001, 0x0060000a, 0x00700080, 0x00104042,
@@ -1751,7 +1774,7 @@ static uint32_t nv44_ctx_prog[] = {
 	0x00600009, 0x00700005, 0x00700006, 0x0060000e, ~0
 };
 
-static uint32_t nv46_ctx_prog[] = {
+static uint32_t nv46_ctxprog[] = {
 	0x00400889, 0x00200000, 0x0060000a, 0x00200000, 0x00300000, 0x00800001,
 	0x00700009, 0x0060000e, 0x00400d64, 0x00400d05, 0x00408f65, 0x00409306,
 	0x0040a068, 0x0040198f, 0x00200001, 0x0060000a, 0x00700080, 0x00104042,
@@ -1782,7 +1805,7 @@ static uint32_t nv46_ctx_prog[] = {
 	0x00600009, 0x00700005, 0x00700006, 0x0060000e, ~0
 };
 
-static uint32_t nv47_ctx_prog[] = {
+static uint32_t nv47_ctxprog[] = {
 	0x00400889, 0x00200000, 0x0060000a, 0x00200000, 0x00300000, 0x00800001,
 	0x00700009, 0x0060000e, 0x00400d64, 0x00400d05, 0x00409265, 0x00409606,
 	0x0040a368, 0x0040198f, 0x00200001, 0x0060000a, 0x00700080, 0x00104042,
@@ -1815,7 +1838,7 @@ static uint32_t nv47_ctx_prog[] = {
 };
 
 /* this is used for nv49 and nv4b */
-static uint32_t nv49_4b_ctx_prog[] = {
+static uint32_t nv49_4b_ctxprog[] = {
 	0x00400564, 0x00400505, 0x00408165, 0x00408206, 0x00409e68, 0x00200020,
 	0x0060000a, 0x00700080, 0x00104042, 0x00200020, 0x0060000a, 0x00700000,
 	0x001040c5, 0x00400f26, 0x00401068, 0x0060000d, 0x0070008f, 0x0070000e,
@@ -1847,7 +1870,7 @@ static uint32_t nv49_4b_ctx_prog[] = {
 };
 
 
-static uint32_t nv4a_ctx_prog[] = {
+static uint32_t nv4a_ctxprog[] = {
 	0x00400889, 0x00200000, 0x0060000a, 0x00200000, 0x00300000, 0x00800001,
 	0x00700009, 0x0060000e, 0x00400d64, 0x00400d05, 0x00409965, 0x00409e06,
 	0x0040ac68, 0x00200000, 0x0060000a, 0x00700000, 0x00106000, 0x00700080,
@@ -1880,7 +1903,7 @@ static uint32_t nv4a_ctx_prog[] = {
 	0x00600009, 0x00700005, 0x00700006, 0x0060000e, ~0
 };
 
-static uint32_t nv4c_ctx_prog[] = {
+static uint32_t nv4c_ctxprog[] = {
 	0x00400889, 0x00200000, 0x0060000a, 0x00200000, 0x00300000, 0x00800001,
 	0x00700009, 0x0060000e, 0x00400d64, 0x00400d05, 0x00409065, 0x00409406,
 	0x0040a168, 0x0040198f, 0x00200001, 0x0060000a, 0x00700080, 0x00104042,
@@ -1911,7 +1934,7 @@ static uint32_t nv4c_ctx_prog[] = {
 	0x0040a405, 0x00600009, 0x00700005, 0x00700006, 0x0060000e, ~0
 };
 
-static uint32_t nv4e_ctx_prog[] = {
+static uint32_t nv4e_ctxprog[] = {
 	0x00400889, 0x00200000, 0x0060000a, 0x00200000, 0x00300000, 0x00800001,
 	0x00700009, 0x0060000e, 0x00400d64, 0x00400d05, 0x00409565, 0x00409a06,
 	0x0040a868, 0x00200000, 0x0060000a, 0x00700000, 0x00106000, 0x00700080,
@@ -1958,7 +1981,7 @@ nv40_graph_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv =
 		(struct drm_nouveau_private *)dev->dev_private;
-	uint32_t *ctx_prog = NULL;
+	uint32_t *ctxprog = NULL;
 	uint32_t vramsz, tmp;
 	int i, j;
 
@@ -1969,39 +1992,39 @@ nv40_graph_init(struct drm_device *dev)
 
 	switch (dev_priv->chipset) {
 	case 0x40:
-		ctx_prog = nv40_ctx_prog;
+		ctxprog = nv40_ctxprog;
 		break;
 	case 0x41:
 	case 0x42:
-		ctx_prog = nv41_ctx_prog;
+		ctxprog = nv41_ctxprog;
 		break;
 	case 0x43:
-		ctx_prog = nv43_ctx_prog;
+		ctxprog = nv43_ctxprog;
 		break;
 	case 0x44:
-		ctx_prog = nv44_ctx_prog;
+		ctxprog = nv44_ctxprog;
 		break;
 	case 0x46:
-		ctx_prog = nv46_ctx_prog;
+		ctxprog = nv46_ctxprog;
 		break;
 	case 0x47:
-		ctx_prog = nv47_ctx_prog;
+		ctxprog = nv47_ctxprog;
 		break;
 	case 0x49:
-		ctx_prog = nv49_4b_ctx_prog;
+		ctxprog = nv49_4b_ctxprog;
 		break;
 	case 0x4a:
-		ctx_prog = nv4a_ctx_prog;
+		ctxprog = nv4a_ctxprog;
 		break;
 	case 0x4b:
-		ctx_prog = nv49_4b_ctx_prog;
+		ctxprog = nv49_4b_ctxprog;
 		break;
 	case 0x4c:
 	case 0x67:
-		ctx_prog = nv4c_ctx_prog;
+		ctxprog = nv4c_ctxprog;
 		break;
 	case 0x4e:
-		ctx_prog = nv4e_ctx_prog;
+		ctxprog = nv4e_ctxprog;
 		break;
 	default:
 		NV_ERROR(dev, "Context program for 0x%02x unavailable\n",
@@ -2011,13 +2034,13 @@ nv40_graph_init(struct drm_device *dev)
 	}
 
 	/* Load the context program onto the card */
-	if (ctx_prog) {
+	if (ctxprog) {
 		NV_DEBUG(dev, "Loading context program\n");
 
 		i = 0;
 		nv_wr32(dev, NV40_PGRAPH_CTXCTL_UCODE_INDEX, 0);
-		while (ctx_prog[i] != ~0) {
-			nv_wr32(dev, NV40_PGRAPH_CTXCTL_UCODE_DATA, ctx_prog[i]);
+		while (ctxprog[i] != ~0) {
+			nv_wr32(dev, NV40_PGRAPH_CTXCTL_UCODE_DATA, ctxprog[i]);
 			i++;
 		}
 	}
@@ -2194,20 +2217,6 @@ nv40_graph_init(struct drm_device *dev)
 		nv_wr32(dev, 0x4008A4, vramsz);
 		break;
 	}
-
-	/* per-context state, doesn't belong here */
-	nv_wr32(dev, 0x400B20, 0x00000000);
-	nv_wr32(dev, 0x400B04, 0xFFFFFFFF);
-
-	tmp = nv_rd32(dev, NV10_PGRAPH_SURFACE) & 0x0007ff00;
-	nv_wr32(dev, NV10_PGRAPH_SURFACE, tmp);
-	tmp = nv_rd32(dev, NV10_PGRAPH_SURFACE) | 0x00020100;
-	nv_wr32(dev, NV10_PGRAPH_SURFACE, tmp);
-
-	nv_wr32(dev, NV03_PGRAPH_ABS_UCLIP_XMIN, 0);
-	nv_wr32(dev, NV03_PGRAPH_ABS_UCLIP_YMIN, 0);
-	nv_wr32(dev, NV03_PGRAPH_ABS_UCLIP_XMAX, 0x7fff);
-	nv_wr32(dev, NV03_PGRAPH_ABS_UCLIP_YMAX, 0x7fff);
 
 	return 0;
 }

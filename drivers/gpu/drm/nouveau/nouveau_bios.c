@@ -187,14 +187,14 @@ struct methods {
 static struct methods nv04_methods[] = {
 	{ "PROM", load_vbios_prom, false },
 	{ "PRAMIN", load_vbios_pramin, true },
-	{ "PCI ROM", load_vbios_pci, true },
+	{ "PCIROM", load_vbios_pci, true },
 	{ }
 };
 
 static struct methods nv50_methods[] = {
 	{ "PRAMIN", load_vbios_pramin, true },
 	{ "PROM", load_vbios_prom, false },
-	{ "PCI ROM", load_vbios_pci, true },
+	{ "PCIROM", load_vbios_pci, true },
 	{ }
 };
 
@@ -203,6 +203,26 @@ static bool NVShadowVBIOS(struct drm_device *dev, uint8_t *data)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct methods *methods, *method;
 	int testscore = 3;
+
+	if (nouveau_vbios) {
+		method = nv04_methods;
+		while (method->loadbios) {
+			if (!strcasecmp(nouveau_vbios, method->desc))
+				break;
+			method++;
+		}
+
+		if (method->loadbios) {
+			NV_INFO(dev, "Attempting to use BIOS image from %s\n",
+				method->desc);
+
+			method->loadbios(dev, data);
+			if (score_vbios(dev, data, method->rw))
+				return true;
+		}
+
+		NV_ERROR(dev, "VBIOS source \'%s\' invalid\n", nouveau_vbios);
+	}
 
 	if (dev_priv->card_type < NV_50)
 		methods = nv04_methods;
@@ -316,7 +336,7 @@ valid_reg(struct nvbios *bios, uint32_t reg)
 	if (WITHIN(reg, NV_PFIFO_OFFSET, NV_PFIFO_SIZE))
 		return 1;
 	if (dev_priv->VBIOS.pub.chip_version >= 0x30 &&
-						WITHIN(reg, 0x4000, 0x600))
+	    (WITHIN(reg, 0x4000, 0x600) || reg == 0x00004600))
 		return 1;
 	if (dev_priv->VBIOS.pub.chip_version >= 0x40 &&
 						WITHIN(reg, 0xc000, 0x48))
@@ -5418,9 +5438,12 @@ nouveau_run_vbios_init(struct drm_device *dev)
 		parse_init_table(bios, bios->some_script_ptr, &iexec);
 	}
 
-	for (i = 0; i < bios->bdcb.dcb.entries; i++) {
-		nouveau_bios_run_display_table(dev, &bios->bdcb.dcb.entry[i],
-					       0, 0);
+	if (dev_priv->card_type >= NV_50) {
+		for (i = 0; i < bios->bdcb.dcb.entries; i++) {
+			nouveau_bios_run_display_table(dev,
+						       &bios->bdcb.dcb.entry[i],
+						       0, 0);
+		}
 	}
 
 	NVLockVgaCrtcs(dev, true);

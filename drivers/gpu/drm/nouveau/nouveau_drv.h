@@ -284,6 +284,10 @@ struct nouveau_fifo_engine {
 	int  (*init)(struct drm_device *);
 	void (*takedown)(struct drm_device *);
 
+	void (*disable)(struct drm_device *);
+	void (*enable)(struct drm_device *);
+	bool (*reassign)(struct drm_device *, bool enable);
+
 	int  (*channel_id)(struct drm_device *);
 
 	int  (*create_context)(struct nouveau_channel *);
@@ -313,6 +317,7 @@ struct nouveau_pgraph_engine {
 
 	void (*fifo_access)(struct drm_device *, bool);
 
+	struct nouveau_channel *(*channel)(struct drm_device *);
 	int  (*create_context)(struct nouveau_channel *);
 	void (*destroy_context)(struct nouveau_channel *);
 	int  (*load_context)(struct nouveau_channel *);
@@ -630,9 +635,11 @@ extern int nouveau_duallink;
 extern int nouveau_uscript_lvds;
 extern int nouveau_uscript_tmds;
 extern int nouveau_vram_pushbuf;
+extern int nouveau_vram_notify;
 extern int nouveau_fbpercrtc;
 extern char *nouveau_tv_norm;
 extern int nouveau_reg_debug;
+extern char *nouveau_vbios;
 
 /* nouveau_state.c */
 extern void nouveau_preclose(struct drm_device *dev, struct drm_file *);
@@ -855,6 +862,9 @@ extern void nv40_fb_takedown(struct drm_device *);
 
 /* nv04_fifo.c */
 extern int  nv04_fifo_init(struct drm_device *);
+extern void nv04_fifo_disable(struct drm_device *);
+extern void nv04_fifo_enable(struct drm_device *);
+extern bool nv04_fifo_reassign(struct drm_device *, bool);
 extern int  nv04_fifo_channel_id(struct drm_device *);
 extern int  nv04_fifo_create_context(struct nouveau_channel *);
 extern void nv04_fifo_destroy_context(struct nouveau_channel *);
@@ -862,6 +872,7 @@ extern int  nv04_fifo_load_context(struct nouveau_channel *);
 extern int  nv04_fifo_save_context(struct nouveau_channel *);
 
 /* nv10_fifo.c */
+extern int  nv10_fifo_init(struct drm_device *);
 extern int  nv10_fifo_channel_id(struct drm_device *);
 extern int  nv10_fifo_create_context(struct nouveau_channel *);
 extern void nv10_fifo_destroy_context(struct nouveau_channel *);
@@ -889,6 +900,7 @@ extern struct nouveau_pgraph_object_class nv04_graph_grclass[];
 extern int  nv04_graph_init(struct drm_device *);
 extern void nv04_graph_takedown(struct drm_device *);
 extern void nv04_graph_fifo_access(struct drm_device *, bool);
+extern struct nouveau_channel *nv04_graph_channel(struct drm_device *);
 extern int  nv04_graph_create_context(struct nouveau_channel *);
 extern void nv04_graph_destroy_context(struct nouveau_channel *);
 extern int  nv04_graph_load_context(struct nouveau_channel *);
@@ -899,6 +911,7 @@ extern void nv04_graph_context_switch(struct drm_device *);
 extern struct nouveau_pgraph_object_class nv10_graph_grclass[];
 extern int  nv10_graph_init(struct drm_device *);
 extern void nv10_graph_takedown(struct drm_device *);
+extern struct nouveau_channel *nv10_graph_channel(struct drm_device *);
 extern int  nv10_graph_create_context(struct nouveau_channel *);
 extern void nv10_graph_destroy_context(struct nouveau_channel *);
 extern int  nv10_graph_load_context(struct nouveau_channel *);
@@ -920,6 +933,7 @@ extern int  nv30_graph_init(struct drm_device *);
 extern struct nouveau_pgraph_object_class nv40_graph_grclass[];
 extern int  nv40_graph_init(struct drm_device *);
 extern void nv40_graph_takedown(struct drm_device *);
+extern struct nouveau_channel *nv40_graph_channel(struct drm_device *);
 extern int  nv40_graph_create_context(struct nouveau_channel *);
 extern void nv40_graph_destroy_context(struct nouveau_channel *);
 extern int  nv40_graph_load_context(struct nouveau_channel *);
@@ -930,6 +944,7 @@ extern struct nouveau_pgraph_object_class nv50_graph_grclass[];
 extern int  nv50_graph_init(struct drm_device *);
 extern void nv50_graph_takedown(struct drm_device *);
 extern void nv50_graph_fifo_access(struct drm_device *, bool);
+extern struct nouveau_channel *nv50_graph_channel(struct drm_device *);
 extern int  nv50_graph_create_context(struct nouveau_channel *);
 extern void nv50_graph_destroy_context(struct nouveau_channel *);
 extern int  nv50_graph_load_context(struct nouveau_channel *);
