@@ -679,23 +679,36 @@ int nv10_graph_load_context(struct nouveau_channel *chan)
 	return 0;
 }
 
-int nv10_graph_save_context(struct nouveau_channel *chan)
+int
+nv10_graph_unload_context(struct drm_device *dev)
 {
-	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
+	struct nouveau_pgraph_engine *pgraph = &dev_priv->engine.graph;
+	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
+	struct nouveau_channel *chan;
+	struct graph_state *ctx;
+	uint32_t tmp;
 	int i;
 
+	chan = pgraph->channel(dev);
+	if (!chan)
+		return 0;
+	ctx = chan->pgraph_ctx;
+
 	for (i = 0; i < ARRAY_SIZE(nv10_graph_ctx_regs); i++)
-		pgraph_ctx->nv10[i] = nv_rd32(dev, nv10_graph_ctx_regs[i]);
+		ctx->nv10[i] = nv_rd32(dev, nv10_graph_ctx_regs[i]);
+
 	if (dev_priv->chipset >= 0x17) {
 		for (i = 0; i < ARRAY_SIZE(nv17_graph_ctx_regs); i++)
-			pgraph_ctx->nv17[i] = nv_rd32(dev,
-						nv17_graph_ctx_regs[i]);
+			ctx->nv17[i] = nv_rd32(dev, nv17_graph_ctx_regs[i]);
 	}
 
 	nv10_graph_save_pipe(chan);
 
+	nv_wr32(dev, NV10_PGRAPH_CTX_CONTROL, 0x10000000);
+	tmp  = nv_rd32(dev, NV10_PGRAPH_CTX_USER) & 0x00ffffff;
+	tmp |= (pfifo->channels - 1) << 24;
+	nv_wr32(dev, NV10_PGRAPH_CTX_USER, tmp);
 	return 0;
 }
 
@@ -705,22 +718,13 @@ nv10_graph_context_switch(struct drm_device *dev)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_pgraph_engine *pgraph = &dev_priv->engine.graph;
 	struct nouveau_channel *chan = NULL;
-	uint32_t tmp;
 	int chid;
 
 	pgraph->fifo_access(dev, false);
 	nouveau_wait_for_idle(dev);
 
 	/* If previous context is valid, we need to save it */
-	chan = pgraph->channel(dev);
-	if (chan) {
-		nv10_graph_save_context(chan);
-
-		nv_wr32(dev, NV10_PGRAPH_CTX_CONTROL, 0x10000000);
-		tmp  = nv_rd32(dev, NV10_PGRAPH_CTX_USER) & 0x00ffffff;
-		tmp |= (dev_priv->engine.fifo.channels - 1) << 24;
-		nv_wr32(dev, NV10_PGRAPH_CTX_USER, tmp);
-	}
+	nv10_graph_unload_context(dev);
 
 	/* Load context for next channel */
 	chid = (nv_rd32(dev, NV04_PGRAPH_TRAPPED_ADDR) >> 20) & 0x1f;
@@ -797,40 +801,10 @@ int nv10_graph_create_context(struct nouveau_channel *chan)
 
 void nv10_graph_destroy_context(struct nouveau_channel *chan)
 {
-	struct drm_device *dev = chan->dev;
-	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_engine *engine = &dev_priv->engine;
 	struct graph_state *pgraph_ctx = chan->pgraph_ctx;
-	int chid;
 
 	kfree(pgraph_ctx);
 	chan->pgraph_ctx = NULL;
-
-	chid = (nv_rd32(dev, NV10_PGRAPH_CTX_USER) >> 24) &
-						(engine->fifo.channels - 1);
-
-	/* This code seems to corrupt the 3D pipe, but blob seems to do similar things ????
-	 */
-#if 0
-	/* does this avoid a potential context switch while we are written graph
-	 * reg, or we should mask graph interrupt ???
-	 */
-	nv_wr32(dev, NV04_PGRAPH_FIFO, 0x0);
-	if (chid == chan->id) {
-		NV_INFO(dev, "cleanning a channel with graph in current context\n");
-		nouveau_wait_for_idle(dev);
-		NV_INFO(dev, "reseting current graph context\n");
-		/*
-		 * can't be call here because of dynamic mem alloc
-		 * nv10_graph_create_context(chan);
-		 */
-		nv10_graph_load_context(chan);
-	}
-	nv_wr32(dev, NV04_PGRAPH_FIFO, 0x1);
-#else
-	if (chid == chan->id)
-		NV_INFO(dev, "cleaning a channel with graph in current context\n");
-#endif
 }
 
 int nv10_graph_init(struct drm_device *dev)

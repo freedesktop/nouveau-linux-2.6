@@ -68,7 +68,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.create_context	= nv04_graph_create_context;
 		engine->graph.destroy_context	= nv04_graph_destroy_context;
 		engine->graph.load_context	= nv04_graph_load_context;
-		engine->graph.save_context	= nv04_graph_save_context;
+		engine->graph.unload_context	= nv04_graph_unload_context;
 		engine->fifo.channels		= 16;
 		engine->fifo.init		= nv04_fifo_init;
 		engine->fifo.takedown		= nouveau_stub_takedown;
@@ -79,7 +79,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fifo.create_context	= nv04_fifo_create_context;
 		engine->fifo.destroy_context	= nv04_fifo_destroy_context;
 		engine->fifo.load_context	= nv04_fifo_load_context;
-		engine->fifo.save_context	= nv04_fifo_save_context;
+		engine->fifo.unload_context	= nv04_fifo_unload_context;
 		break;
 	case 0x10:
 		engine->instmem.init		= nv04_instmem_init;
@@ -107,7 +107,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.destroy_context	= nv10_graph_destroy_context;
 		engine->graph.fifo_access	= nv04_graph_fifo_access;
 		engine->graph.load_context	= nv10_graph_load_context;
-		engine->graph.save_context	= nv10_graph_save_context;
+		engine->graph.unload_context	= nv10_graph_unload_context;
 		engine->fifo.channels		= 32;
 		engine->fifo.init		= nv10_fifo_init;
 		engine->fifo.takedown		= nouveau_stub_takedown;
@@ -118,7 +118,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fifo.create_context	= nv10_fifo_create_context;
 		engine->fifo.destroy_context	= nv10_fifo_destroy_context;
 		engine->fifo.load_context	= nv10_fifo_load_context;
-		engine->fifo.save_context	= nv10_fifo_save_context;
+		engine->fifo.unload_context	= nv10_fifo_unload_context;
 		break;
 	case 0x20:
 		engine->instmem.init		= nv04_instmem_init;
@@ -146,7 +146,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.destroy_context	= nv20_graph_destroy_context;
 		engine->graph.fifo_access	= nv04_graph_fifo_access;
 		engine->graph.load_context	= nv20_graph_load_context;
-		engine->graph.save_context	= nv20_graph_save_context;
+		engine->graph.unload_context	= nv20_graph_unload_context;
 		engine->fifo.channels		= 32;
 		engine->fifo.init		= nv10_fifo_init;
 		engine->fifo.takedown		= nouveau_stub_takedown;
@@ -157,7 +157,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fifo.create_context	= nv10_fifo_create_context;
 		engine->fifo.destroy_context	= nv10_fifo_destroy_context;
 		engine->fifo.load_context	= nv10_fifo_load_context;
-		engine->fifo.save_context	= nv10_fifo_save_context;
+		engine->fifo.unload_context	= nv10_fifo_unload_context;
 		break;
 	case 0x30:
 		engine->instmem.init		= nv04_instmem_init;
@@ -185,7 +185,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.create_context	= nv20_graph_create_context;
 		engine->graph.destroy_context	= nv20_graph_destroy_context;
 		engine->graph.load_context	= nv20_graph_load_context;
-		engine->graph.save_context	= nv20_graph_save_context;
+		engine->graph.unload_context	= nv20_graph_unload_context;
 		engine->fifo.channels		= 32;
 		engine->fifo.init		= nv10_fifo_init;
 		engine->fifo.takedown		= nouveau_stub_takedown;
@@ -196,7 +196,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fifo.create_context	= nv10_fifo_create_context;
 		engine->fifo.destroy_context	= nv10_fifo_destroy_context;
 		engine->fifo.load_context	= nv10_fifo_load_context;
-		engine->fifo.save_context	= nv10_fifo_save_context;
+		engine->fifo.unload_context	= nv10_fifo_unload_context;
 		break;
 	case 0x40:
 	case 0x60:
@@ -225,7 +225,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.create_context	= nv40_graph_create_context;
 		engine->graph.destroy_context	= nv40_graph_destroy_context;
 		engine->graph.load_context	= nv40_graph_load_context;
-		engine->graph.save_context	= nv40_graph_save_context;
+		engine->graph.unload_context	= nv40_graph_unload_context;
 		engine->fifo.channels		= 32;
 		engine->fifo.init		= nv40_fifo_init;
 		engine->fifo.takedown		= nouveau_stub_takedown;
@@ -236,7 +236,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fifo.create_context	= nv40_fifo_create_context;
 		engine->fifo.destroy_context	= nv40_fifo_destroy_context;
 		engine->fifo.load_context	= nv40_fifo_load_context;
-		engine->fifo.save_context	= nv40_fifo_save_context;
+		engine->fifo.unload_context	= nv40_fifo_unload_context;
 		break;
 	case 0x50:
 	case 0x80: /* gotta love NVIDIA's consistency.. */
@@ -267,7 +267,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->graph.create_context	= nv50_graph_create_context;
 		engine->graph.destroy_context	= nv50_graph_destroy_context;
 		engine->graph.load_context	= nv50_graph_load_context;
-		engine->graph.save_context	= nv50_graph_save_context;
+		engine->graph.unload_context	= nv50_graph_unload_context;
 		engine->fifo.channels		= 128;
 		engine->fifo.init		= nv50_fifo_init;
 		engine->fifo.takedown		= nv50_fifo_takedown;
@@ -278,7 +278,7 @@ static int nouveau_init_engine_ptrs(struct drm_device *dev)
 		engine->fifo.create_context	= nv50_fifo_create_context;
 		engine->fifo.destroy_context	= nv50_fifo_destroy_context;
 		engine->fifo.load_context	= nv50_fifo_load_context;
-		engine->fifo.save_context	= nv50_fifo_save_context;
+		engine->fifo.unload_context	= nv50_fifo_unload_context;
 		break;
 	default:
 		NV_ERROR(dev, "NV%02x unsupported\n", dev_priv->chipset);

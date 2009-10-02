@@ -284,32 +284,18 @@ nouveau_channel_free(struct nouveau_channel *chan)
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_pgraph_engine *pgraph = &dev_priv->engine.graph;
 	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
-	struct nouveau_timer_engine *ptimer = &dev_priv->engine.timer;
-	unsigned fbdev_flags = 0;
-	uint64_t t_start;
-	bool timeout = false;
+	unsigned long flags;
 	int ret;
 
 	NV_INFO(dev, "%s: freeing fifo %d\n", __func__, chan->id);
 
 	nouveau_debugfs_channel_fini(chan);
 
-	/* Give the channel a chance to idle, wait 2s (hopefully) */
-	t_start = ptimer->read(dev);
-	while (!nouveau_channel_idle(chan)) {
-		if (ptimer->read(dev) - t_start > 2000000000ULL) {
-			NV_ERROR(dev, "Failed to idle channel %d.  "
-				      "Prepare for strangeness..\n", chan->id);
-			timeout = true;
-			break;
-		}
-	}
-
-	/* Wait on a fence until channel goes idle, this ensures the engine
-	 * has finished with the last push buffer completely before we destroy
-	 * the channel.
-	 */
-	if (!timeout) {
+	/* Give outstanding push buffers a chance to complete */
+	spin_lock_irqsave(&chan->fence.lock, flags);
+	nouveau_fence_update(chan);
+	spin_unlock_irqrestore(&chan->fence.lock, flags);
+	if (chan->fence.sequence != chan->fence.sequence_ack) {
 		struct nouveau_fence *fence = NULL;
 
 		ret = nouveau_fence_new(chan, &fence, true);
@@ -318,11 +304,8 @@ nouveau_channel_free(struct nouveau_channel *chan)
 			nouveau_fence_unref((void *)&fence);
 		}
 
-		if (ret) {
-			NV_ERROR(dev, "Failed to fence channel %d.  "
-				      "Prepare for strangeness..\n", chan->id);
-			timeout = true;
-		}
+		if (ret)
+			NV_ERROR(dev, "Failed to idle channel %d.\n", chan->id);
 	}
 
 	/* Ensure all outstanding fences are signaled.  They should be if the
@@ -331,31 +314,30 @@ nouveau_channel_free(struct nouveau_channel *chan)
 	 */
 	nouveau_fence_fini(chan);
 
-	/* disable the fifo caches */
-	if (dev_priv->fbdev_info) {
-		fbdev_flags = dev_priv->fbdev_info->flags;
-		dev_priv->fbdev_info->flags |= FBINFO_HWACCEL_DISABLED;
-	}
-
+	/* Ensure the channel is no longer active on the GPU */
 	pfifo->reassign(dev, false);
-	pfifo->disable(dev);
-	pfifo->destroy_context(chan);
+
+	if (pgraph->channel(dev) == chan) {
+		pgraph->fifo_access(dev, false);
+		pgraph->unload_context(dev);
+		pgraph->fifo_access(dev, true);
+	}
 	pgraph->destroy_context(chan);
-	pfifo->enable(dev);
+
+	if (pfifo->channel_id(dev) == chan->id) {
+		pfifo->disable(dev);
+		pfifo->unload_context(dev);
+		pfifo->enable(dev);
+	}
+	pfifo->destroy_context(chan);
+
 	pfifo->reassign(dev, true);
 
-	if (dev_priv->fbdev_info)
-		dev_priv->fbdev_info->flags = fbdev_flags;
-
-	/* Deallocate push buffer */
+	/* Release the channel's resources */
 	nouveau_gpuobj_ref_del(dev, &chan->pushbuf);
 	nouveau_bo_ref(NULL, &chan->pushbuf_bo);
-
-	/* Destroy objects belonging to the channel */
 	nouveau_gpuobj_channel_takedown(chan);
-
 	nouveau_notifier_takedown_channel(chan);
-
 	if (chan->user)
 		iounmap(chan->user);
 

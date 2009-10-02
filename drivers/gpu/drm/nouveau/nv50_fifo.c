@@ -320,9 +320,6 @@ nv50_fifo_destroy_context(struct nouveau_channel *chan)
 
 	NV_DEBUG(dev, "ch%d\n", chan->id);
 
-	if ((nv_rd32(dev, NV03_PFIFO_CACHE1_PUSH1) & 0xffff) == chan->id)
-		nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH1, 127);
-
 	nouveau_gpuobj_ref_del(dev, &chan->ramfc);
 	nouveau_gpuobj_ref_del(dev, &chan->cache);
 
@@ -401,20 +398,34 @@ nv50_fifo_load_context(struct nouveau_channel *chan)
 
 	dev_priv->engine.instmem.finish_access(dev);
 
+	nv_wr32(dev, NV03_PFIFO_CACHE1_GET, 0);
+	nv_wr32(dev, NV03_PFIFO_CACHE1_PUT, 0);
 	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH1, chan->id | (1<<16));
 	return 0;
 }
 
 int
-nv50_fifo_save_context(struct nouveau_channel *chan)
+nv50_fifo_unload_context(struct drm_device *dev)
 {
-	struct drm_device *dev = chan->dev;
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	struct nouveau_gpuobj *ramfc = chan->ramfc->gpuobj;
-	struct nouveau_gpuobj *cache = chan->cache->gpuobj;
-	int put, get, ptr;
+	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
+	struct nouveau_gpuobj *ramfc, *cache;
+	struct nouveau_channel *chan = NULL;
+	int chid, get, put, ptr;
 
 	NV_DEBUG(chan->dev, "ch%d\n", chan->id);
+
+	chid = pfifo->channel_id(dev);
+	if (chid < 0 || chid >= dev_priv->engine.fifo.channels)
+		return 0;
+
+	chan = dev_priv->fifos[chid];
+	if (!chan) {
+		NV_ERROR(dev, "Inactive channel on PFIFO: %d\n", chid);
+		return -EINVAL;
+	}
+	ramfc = chan->ramfc->gpuobj;
+	cache = chan->cache->gpuobj;
 
 	dev_priv->engine.instmem.prepare_access(dev, true);
 
@@ -465,7 +476,6 @@ nv50_fifo_save_context(struct nouveau_channel *chan)
 
 	/* guessing that all the 0x34xx regs aren't on NV50 */
 	if (!IS_G80) {
-
 		nv_wo32(dev, ramfc, 0x84/4, ptr >> 1);
 		nv_wo32(dev, ramfc, 0x88/4, nv_rd32(dev, 0x340c));
 		nv_wo32(dev, ramfc, 0x8c/4, nv_rd32(dev, 0x3400));
@@ -476,6 +486,8 @@ nv50_fifo_save_context(struct nouveau_channel *chan)
 
 	dev_priv->engine.instmem.finish_access(dev);
 
+	/*XXX: probably reload ch127 (NULL) state back too */
+	nv_wr32(dev, NV03_PFIFO_CACHE1_PUSH1, 127);
 	return 0;
 }
 
