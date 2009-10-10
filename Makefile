@@ -1,3 +1,5 @@
+$(error This branch is abandoned, do not use it.)
+
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 31
