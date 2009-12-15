@@ -62,20 +62,7 @@ fw-shipped-$(CONFIG_DRM_RADEON) += radeon/R100_cp.bin radeon/R200_cp.bin \
 				   radeon/RV770_pfp.bin radeon/RV770_me.bin \
 				   radeon/RV730_pfp.bin radeon/RV730_me.bin \
 				   radeon/RV710_pfp.bin radeon/RV710_me.bin
-fw-shipped-$(CONFIG_DRM_NOUVEAU) += nouveau/nv40.ctxprog nouveau/nv40.ctxvals \
-				    nouveau/nv41.ctxprog nouveau/nv41.ctxvals \
-				    nouveau/nv42.ctxprog nouveau/nv42.ctxvals \
-				    nouveau/nv43.ctxprog nouveau/nv43.ctxvals \
-				    nouveau/nv44.ctxprog nouveau/nv44.ctxvals \
-				    nouveau/nv46.ctxprog nouveau/nv46.ctxvals \
-				    nouveau/nv47.ctxprog nouveau/nv47.ctxvals \
-				    nouveau/nv49.ctxprog nouveau/nv49.ctxvals \
-				    nouveau/nv4a.ctxprog nouveau/nv4a.ctxvals \
-				    nouveau/nv4b.ctxprog nouveau/nv4b.ctxvals \
-				    nouveau/nv4c.ctxprog nouveau/nv4c.ctxvals \
-				    nouveau/nv4e.ctxprog nouveau/nv4e.ctxvals \
-				    nouveau/nv67.ctxprog nouveau/nv67.ctxvals \
-				    nouveau/nv50.ctxprog nouveau/nv50.ctxvals \
+fw-shipped-$(CONFIG_DRM_NOUVEAU) += nouveau/nv50.ctxprog nouveau/nv50.ctxvals \
 				    nouveau/nv84.ctxprog nouveau/nv84.ctxvals \
 				    nouveau/nv86.ctxprog nouveau/nv86.ctxvals \
 				    nouveau/nv92.ctxprog nouveau/nv92.ctxvals \
