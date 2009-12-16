@@ -147,12 +147,6 @@ nouveau_pci_suspend(struct pci_dev *pdev, pm_message_t pm_state)
 
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		struct nouveau_framebuffer *nouveau_fb;
-		struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
-
-		if (nv_crtc->lut.nvbo)
-			nouveau_bo_unpin(nv_crtc->lut.nvbo);
-		if (nv_crtc->cursor.nvbo)
-			nouveau_bo_unpin(nv_crtc->cursor.nvbo);
 
 		nouveau_fb = nouveau_framebuffer(crtc->fb);
 		if (!nouveau_fb || !nouveau_fb->nvbo)
@@ -294,12 +288,7 @@ nouveau_pci_resume(struct pci_dev *pdev)
 	NV_INFO(dev, "Restoring mode...\n");
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		struct nouveau_framebuffer *nouveau_fb;
-		struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
 
-		if (nv_crtc->lut.nvbo)
-			nouveau_bo_pin(nv_crtc->lut.nvbo, TTM_PL_FLAG_VRAM);
-		if (nv_crtc->cursor.nvbo)
-			nouveau_bo_pin(nv_crtc->cursor.nvbo, TTM_PL_FLAG_VRAM);
 		nouveau_fb = nouveau_framebuffer(crtc->fb);
 		if (!nouveau_fb || !nouveau_fb->nvbo)
 			continue;
