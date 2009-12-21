@@ -103,13 +103,9 @@ nouveau_bo_fixup_align(struct drm_device *dev,
 				*align = 32768;
 				*size = roundup(*size, 64 * tile_mode);
 
-			} else if (dev_priv->chipset >= 0x20) {
-				*align = 16384;
-				*size = roundup(*size, 32 * tile_mode);
-
 			} else if (dev_priv->chipset >= 0x10) {
 				*align = 16384;
-				*size = roundup(*size, 16 * tile_mode);
+				*size = roundup(*size, 32 * tile_mode);
 			}
 		}
 	}
