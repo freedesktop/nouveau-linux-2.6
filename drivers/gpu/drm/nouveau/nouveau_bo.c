@@ -83,7 +83,7 @@ nouveau_bo_fixup_align(struct drm_device *dev,
 			} else if (dev_priv->chipset >= 0x90) {
 				*size = roundup(*size, 16384);
 				*size += 3 * 16384;
-				*align = 12 * 16834;
+				*align = 12 * 16384;
 			} else {
 				*size = roundup(*size, 8192);
 				*size += 3 * 8192;
