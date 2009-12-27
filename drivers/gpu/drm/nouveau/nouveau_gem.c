@@ -95,7 +95,7 @@ nouveau_gem_info(struct drm_gem_object *gem, struct drm_nouveau_gem_info *rep)
 	else
 		rep->domain = NOUVEAU_GEM_DOMAIN_VRAM;
 
-	rep->size = (nvbo->bo.mem.num_pages - nvbo->padding) << PAGE_SHIFT;
+	rep->size = nvbo->bo.mem.num_pages << PAGE_SHIFT;
 	rep->offset = nvbo->bo.offset;
 	rep->map_handle = nvbo->mappable ? nvbo->bo.addr_space_offset : 0;
 	rep->tile_mode = nvbo->tile_mode;
@@ -907,19 +907,6 @@ nouveau_gem_ioctl_cpu_prep(struct drm_device *dev, void *data,
 	if (!gem)
 		return ret;
 	nvbo = nouveau_gem_object(gem);
-
-	/* Buffer objects with tile flags need to be in vram, so move them. */
-	if (nvbo->tile_flags) {
-		ret = ttm_bo_reserve(&nvbo->bo, false, false, false, 0);
-		if (ret)
-			return ret;
-
-		ret = ttm_bo_validate(&nvbo->bo, &nvbo->placement, false, false);
-		if (ret)
-			return ret;
-
-		ttm_bo_unreserve(&nvbo->bo);
-	}
 
 	if (nvbo->cpu_filp) {
 		if (nvbo->cpu_filp == file_priv)

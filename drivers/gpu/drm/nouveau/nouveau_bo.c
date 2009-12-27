@@ -136,7 +136,7 @@ nouveau_bo_new(struct drm_device *dev, struct nouveau_channel *chan,
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_bo *nvbo;
-	int ret = 0, original_size;
+	int ret = 0;
 
 	nvbo = kzalloc(sizeof(struct nouveau_bo), GFP_KERNEL);
 	if (!nvbo)
@@ -148,17 +148,7 @@ nouveau_bo_new(struct drm_device *dev, struct nouveau_channel *chan,
 	nvbo->tile_mode = tile_mode;
 	nvbo->tile_flags = tile_flags;
 
-	/* NV50: align to page size, any extra size after that is padding. */
-	if (dev_priv->card_type == NV_50)
-		original_size = size = roundup(size, 65536);
-	else
-		original_size = size = roundup(size, PAGE_SIZE);
 	nouveau_bo_fixup_align(dev, tile_mode, tile_flags, &align, &size);
-	/* Touching this padding is dangerous as it will interfere with other
-	 * buffer objects.
-	 */
-	if (dev_priv->card_type == NV_50)
-		nvbo->padding = (size - original_size) >> PAGE_SHIFT;
 	align >>= PAGE_SHIFT;
 
 	nvbo->placement.fpfn = 0;
@@ -293,8 +283,7 @@ nouveau_bo_map(struct nouveau_bo *nvbo)
 	if (ret)
 		return ret;
 
-	ret = ttm_bo_kmap(&nvbo->bo, 0, nvbo->bo.mem.num_pages - nvbo->padding,
-					&nvbo->kmap);
+	ret = ttm_bo_kmap(&nvbo->bo, 0, nvbo->bo.mem.num_pages, &nvbo->kmap);
 	ttm_bo_unreserve(&nvbo->bo);
 	return ret;
 }
@@ -678,9 +667,8 @@ nouveau_bo_vm_bind(struct ttm_buffer_object *bo, struct ttm_mem_reg *new_mem,
 	if (dev_priv->card_type == NV_50) {
 		ret = nv50_mem_vm_bind_linear(dev,
 					      offset + dev_priv->vm_vram_base,
-					      new_mem->size -
-					      (nvbo->padding << PAGE_SHIFT),
-					      nvbo->tile_flags, offset);
+					      new_mem->size, nvbo->tile_flags,
+					      offset);
 		if (ret)
 			return ret;
 

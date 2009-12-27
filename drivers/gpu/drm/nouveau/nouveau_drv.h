@@ -91,8 +91,6 @@ struct nouveau_bo {
 
 	uint32_t tile_mode;
 	uint32_t tile_flags;
-	/* tile_flags dependent padding (in pages). */
-	int padding;
 	struct nouveau_tile_reg *tile;
 
 	struct drm_gem_object *gem;
