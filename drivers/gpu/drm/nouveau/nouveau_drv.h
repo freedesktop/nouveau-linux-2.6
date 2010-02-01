@@ -358,6 +358,7 @@ struct nouveau_engine {
 	struct nouveau_fb_engine      fb;
 	struct nouveau_pgraph_engine  graph;
 	struct nouveau_fifo_engine    fifo;
+	spinlock_t lock;
 };
 
 struct nouveau_pll_vals {
