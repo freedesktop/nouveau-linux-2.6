@@ -280,10 +280,17 @@ nouveau_channel_free(struct nouveau_channel *chan)
 	 */
 	nouveau_fence_fini(chan);
 
-	spin_lock_irqsave(&dev_priv->engine.lock, flags);
-
-	/* Ensure the channel is no longer active on the GPU */
+	/* This will prevent pfifo from switching channels. */
 	pfifo->reassign(dev, false);
+
+	/* We want to give pgraph a chance to idle and get rid of all potential
+	 * errors. We need to do this before the lock, otherwise the irq handler
+	 * is unable to process them.
+	 */
+	if (pgraph->channel(dev) == chan)
+		nouveau_wait_for_idle(dev);
+
+	spin_lock_irqsave(&dev_priv->engine.lock, flags);
 
 	pgraph->fifo_access(dev, false);
 	if (pgraph->channel(dev) == chan)
