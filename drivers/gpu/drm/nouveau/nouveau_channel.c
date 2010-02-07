@@ -113,7 +113,6 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	struct nouveau_pgraph_engine *pgraph = &dev_priv->engine.graph;
 	struct nouveau_fifo_engine *pfifo = &dev_priv->engine.fifo;
 	struct nouveau_channel *chan;
-	unsigned long flags;
 	int channel, user;
 	int ret;
 
@@ -204,8 +203,6 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 		return ret;
 	}
 
-	spin_lock_irqsave(&dev_priv->engine.lock, flags);
-
 	/* disable the fifo caches */
 	pfifo->reassign(dev, false);
 
@@ -224,8 +221,6 @@ nouveau_channel_alloc(struct drm_device *dev, struct nouveau_channel **chan_ret,
 	}
 
 	pfifo->reassign(dev, true);
-
-	spin_unlock_irqrestore(&dev_priv->engine.lock, flags);
 
 	ret = nouveau_dma_init(chan);
 	if (!ret)
@@ -290,7 +285,7 @@ nouveau_channel_free(struct nouveau_channel *chan)
 	if (pgraph->channel(dev) == chan)
 		nouveau_wait_for_idle(dev);
 
-	spin_lock_irqsave(&dev_priv->engine.lock, flags);
+	spin_lock_irqsave(&dev_priv->context_switch_lock, flags);
 
 	pgraph->fifo_access(dev, false);
 	if (pgraph->channel(dev) == chan)
@@ -307,7 +302,7 @@ nouveau_channel_free(struct nouveau_channel *chan)
 
 	pfifo->reassign(dev, true);
 
-	spin_unlock_irqrestore(&dev_priv->engine.lock, flags);
+	spin_unlock_irqrestore(&dev_priv->context_switch_lock, flags);
 
 	/* Release the channel's resources */
 	nouveau_gpuobj_ref_del(dev, &chan->pushbuf);

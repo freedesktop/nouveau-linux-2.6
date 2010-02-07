@@ -697,7 +697,7 @@ nouveau_irq_handler(DRM_IRQ_ARGS)
 	if (!status)
 		return IRQ_NONE;
 
-	spin_lock_irqsave(&dev_priv->engine.lock, flags);
+	spin_lock_irqsave(&dev_priv->context_switch_lock, flags);
 
 	if (dev_priv->fbdev_info) {
 		fbdev_flags = dev_priv->fbdev_info->flags;
@@ -736,7 +736,7 @@ nouveau_irq_handler(DRM_IRQ_ARGS)
 	if (dev_priv->fbdev_info)
 		dev_priv->fbdev_info->flags = fbdev_flags;
 
-	spin_unlock_irqrestore(&dev_priv->engine.lock, flags);
+	spin_unlock_irqrestore(&dev_priv->context_switch_lock, flags);
 
 	return IRQ_HANDLED;
 }
