@@ -5876,6 +5876,7 @@ static bool NVInitVBIOS(struct drm_device *dev)
 	struct nvbios *bios = &dev_priv->VBIOS;
 
 	memset(bios, 0, sizeof(struct nvbios));
+	spin_lock_init(&bios->lock);
 	bios->dev = dev;
 
 	if (!NVShadowVBIOS(dev, bios->data))
@@ -5981,7 +5982,6 @@ nouveau_bios_init(struct drm_device *dev)
 	int ret;
 
 	dev_priv->vbios = &bios->pub;
-	spin_lock_init(&bios->lock);
 
 	if (!NVInitVBIOS(dev))
 		return -ENODEV;
