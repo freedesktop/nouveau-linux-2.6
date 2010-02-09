@@ -146,8 +146,11 @@ FIRE_RING(struct nouveau_channel *chan)
 		return;
 	chan->accel_done = true;
 
-	WRITE_PUT(chan->dma.cur);
+	if (unlikely(chan->id < 0))
+		chan->dma.cur &= chan->dma.max;
+
 	chan->dma.put = chan->dma.cur;
+	WRITE_PUT(chan->dma.put);
 }
 
 static inline void
