@@ -162,33 +162,11 @@ READ_GET(struct nouveau_channel *chan, uint32_t *prev_get, uint32_t *timeout)
 	return (val - chan->pushbuf_base) >> 2;
 }
 
-static int
-nouveau_evo_dma_wait(struct nouveau_channel *chan, int size)
-{
-	uint32_t prev_get = 0, cnt = 0;
-	int get;
-
-	while (chan->dma.free < size) {
-		get = READ_GET(chan, &prev_get, &cnt);
-		if (unlikely(get < 0))
-			return get;
-
-		chan->dma.free = get - chan->dma.cur;
-		if (chan->dma.free <= 0)
-			chan->dma.free += chan->dma.max + 1;
-	}
-
-	return 0;
-}
-
 int
 nouveau_dma_wait(struct nouveau_channel *chan, int size)
 {
 	uint32_t prev_get = 0, cnt = 0;
 	int get;
-
-	if (unlikely(chan->id) < 0)
-		return nouveau_evo_dma_wait(chan, size);
 
 	while (chan->dma.free < size) {
 		get = READ_GET(chan, &prev_get, &cnt);
