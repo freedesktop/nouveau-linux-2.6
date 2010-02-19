@@ -243,6 +243,8 @@ validate_fini_list(struct list_head *list, struct nouveau_fence *fence)
 			nouveau_fence_unref((void *)&prev_fence);
 		}
 
+		ttm_bo_kunmap(&nvbo->kmap);
+
 		list_del(&nvbo->entry);
 		nvbo->reserved_by = NULL;
 		ttm_bo_unreserve(&nvbo->bo);
