@@ -83,6 +83,7 @@ struct nouveau_bo {
 	struct drm_file *reserved_by;
 	struct list_head entry;
 	int pbbo_index;
+	bool validate_mapped;
 
 	struct nouveau_channel *channel;
 

@@ -243,7 +243,10 @@ validate_fini_list(struct list_head *list, struct nouveau_fence *fence)
 			nouveau_fence_unref((void *)&prev_fence);
 		}
 
-		ttm_bo_kunmap(&nvbo->kmap);
+		if (unlikely(nvbo->validate_mapped)) {
+			ttm_bo_kunmap(&nvbo->kmap);
+			nvbo->validate_mapped = false;
+		}
 
 		list_del(&nvbo->entry);
 		nvbo->reserved_by = NULL;
@@ -535,6 +538,7 @@ nouveau_gem_pushbuf_reloc_apply(struct drm_device *dev,
 				NV_ERROR(dev, "failed kmap for reloc\n");
 				break;
 			}
+			nvbo->validate_mapped = true;
 		}
 
 		if (r->flags & NOUVEAU_GEM_RELOC_LOW)
@@ -691,6 +695,7 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 						WIND_RING(chan);
 						goto out;
 					}
+					nvbo->validate_mapped = true;
 				}
 
 				nouveau_bo_wr32(nvbo, (push[i].offset +
