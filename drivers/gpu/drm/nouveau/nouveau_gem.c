@@ -167,12 +167,10 @@ nouveau_gem_ioctl_new(struct drm_device *dev, void *data,
 
 	ret = drm_gem_handle_create(file_priv, nvbo->gem, &req->info.handle);
 out:
-	mutex_lock(&dev->struct_mutex);
-	drm_gem_object_handle_unreference(nvbo->gem);
-	mutex_unlock(&dev->struct_mutex);
+	drm_gem_object_handle_unreference_unlocked(nvbo->gem);
 
 	if (ret)
-		drm_gem_object_unreference(nvbo->gem);
+		drm_gem_object_unreference_unlocked(nvbo->gem);
 	return ret;
 }
 
@@ -791,9 +789,7 @@ nouveau_gem_ioctl_cpu_prep(struct drm_device *dev, void *data,
 	}
 
 out:
-	mutex_lock(&dev->struct_mutex);
-	drm_gem_object_unreference(gem);
-	mutex_unlock(&dev->struct_mutex);
+	drm_gem_object_unreference_unlocked(gem);
 	return ret;
 }
 
@@ -821,9 +817,7 @@ nouveau_gem_ioctl_cpu_fini(struct drm_device *dev, void *data,
 	ret = 0;
 
 out:
-	mutex_lock(&dev->struct_mutex);
-	drm_gem_object_unreference(gem);
-	mutex_unlock(&dev->struct_mutex);
+	drm_gem_object_unreference_unlocked(gem);
 	return ret;
 }
 
@@ -842,9 +836,7 @@ nouveau_gem_ioctl_info(struct drm_device *dev, void *data,
 		return -EINVAL;
 
 	ret = nouveau_gem_info(gem, req);
-	mutex_lock(&dev->struct_mutex);
-	drm_gem_object_unreference(gem);
-	mutex_unlock(&dev->struct_mutex);
+	drm_gem_object_unreference_unlocked(gem);
 	return ret;
 }
 

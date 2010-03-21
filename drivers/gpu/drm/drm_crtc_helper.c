@@ -702,7 +702,7 @@ bool drm_crtc_helper_set_mode(struct drm_crtc *crtc,
 		if (encoder->crtc != crtc)
 			continue;
 
-		DRM_INFO("%s: set mode %s %x\n", drm_get_encoder_name(encoder),
+		DRM_DEBUG("%s: set mode %s %x\n", drm_get_encoder_name(encoder),
 			 mode->name, mode->base.id);
 		encoder_funcs = encoder->helper_private;
 		encoder_funcs->mode_set(encoder, mode, adjusted_mode);
@@ -836,11 +836,7 @@ int drm_crtc_helper_set_config(struct drm_mode_set *set)
 			mode_changed = true;
 		} else if (set->fb == NULL) {
 			mode_changed = true;
-		} else if ((set->fb->bits_per_pixel !=
-			 set->crtc->fb->bits_per_pixel) ||
-			 set->fb->depth != set->crtc->fb->depth)
-			fb_changed = true;
-		else
+		} else
 			fb_changed = true;
 	}
 
@@ -1032,7 +1028,8 @@ bool drm_helper_initial_config(struct drm_device *dev)
 	/*
 	 * we shouldn't end up with no modes here.
 	 */
-	WARN(!count, "No connectors reported connected with modes\n");
+	if (count == 0)
+		printk(KERN_INFO "No connectors reported connected with modes\n");
 
 	drm_setup_crtcs(dev);
 

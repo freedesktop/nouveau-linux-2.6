@@ -430,7 +430,8 @@ static struct sock *sco_sock_alloc(struct net *net, struct socket *sock, int pro
 	return sk;
 }
 
-static int sco_sock_create(struct net *net, struct socket *sock, int protocol)
+static int sco_sock_create(struct net *net, struct socket *sock, int protocol,
+			   int kern)
 {
 	struct sock *sk;
 
@@ -952,7 +953,9 @@ drop:
 	return 0;
 }
 
-static ssize_t sco_sysfs_show(struct class *dev, char *buf)
+static ssize_t sco_sysfs_show(struct class *dev,
+				struct class_attribute *attr,
+				char *buf)
 {
 	struct sock *sk;
 	struct hlist_node *node;
@@ -993,7 +996,7 @@ static const struct proto_ops sco_sock_ops = {
 	.getsockopt	= sco_sock_getsockopt
 };
 
-static struct net_proto_family sco_sock_family_ops = {
+static const struct net_proto_family sco_sock_family_ops = {
 	.family	= PF_BLUETOOTH,
 	.owner	= THIS_MODULE,
 	.create	= sco_sock_create,

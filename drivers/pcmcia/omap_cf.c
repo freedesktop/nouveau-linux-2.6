@@ -23,8 +23,8 @@
 #include <asm/io.h>
 #include <asm/sizes.h>
 
-#include <mach/mux.h>
-#include <mach/tc.h>
+#include <plat/mux.h>
+#include <plat/tc.h>
 
 
 /* NOTE:  don't expect this to support many I/O cards.  The 16xx chips have
@@ -70,8 +70,6 @@ struct omap_cf_socket {
 };
 
 #define	POLL_INTERVAL		(2 * HZ)
-
-#define	SZ_2K			(2 * SZ_1K)
 
 /*--------------------------------------------------------------------------*/
 
