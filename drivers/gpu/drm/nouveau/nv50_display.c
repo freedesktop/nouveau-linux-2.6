@@ -492,6 +492,12 @@ int nv50_display_create(struct drm_device *dev)
 		return ret;
 	}
 
+	ret = nv50_display_init(dev);
+	if (ret) {
+		nv50_evo_channel_del(&dev_priv->evo);
+		return ret;
+	}
+
 	/* Create CRTC objects */
 	for (i = 0; i < 2; i++)
 		nv50_crtc_create(dev, i);
@@ -527,10 +533,6 @@ int nv50_display_create(struct drm_device *dev)
 			continue;
 		nouveau_connector_create(dev, &dcb->connector.entry[i]);
 	}
-
-	ret = nv50_display_init(dev);
-	if (ret)
-		return ret;
 
 	return 0;
 }
