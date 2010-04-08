@@ -338,6 +338,14 @@ nouveau_channel_cleanup(struct drm_device *dev, struct drm_file *file_priv)
 		if (chan && chan->file_priv == file_priv)
 			nouveau_channel_free(chan);
 	}
+	
+	if (dev_priv->vpe_channel) {
+		NV_DEBUG(dev, "clearing VPE channel from file_priv\n");
+		struct nouveau_vd_vpe_channel *vpe_channel = dev_priv->vpe_channel;
+		
+		if (vpe_channel->file_priv == file_priv)
+			nouveau_vpe_channel_free(vpe_channel);
+	}
 }
 
 int
@@ -442,6 +450,10 @@ struct drm_ioctl_desc nouveau_ioctls[] = {
 	DRM_IOCTL_DEF(DRM_NOUVEAU_GEM_CPU_PREP, nouveau_gem_ioctl_cpu_prep, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_NOUVEAU_GEM_CPU_FINI, nouveau_gem_ioctl_cpu_fini, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_NOUVEAU_GEM_INFO, nouveau_gem_ioctl_info, DRM_AUTH),
+	DRM_IOCTL_DEF(DRM_NOUVEAU_VD_VPE_CHANNEL_ALLOC, nouveau_vd_vpe_ioctl_channel_alloc, DRM_AUTH),
+	DRM_IOCTL_DEF(DRM_NOUVEAU_VD_VPE_CHANNEL_FREE, nouveau_vd_vpe_ioctl_channel_free, DRM_AUTH),
+	DRM_IOCTL_DEF(DRM_NOUVEAU_VD_VPE_PUSHBUF_FIRE, nouveau_vd_vpe_ioctl_pushbuf_fire, DRM_AUTH),
+	DRM_IOCTL_DEF(DRM_NOUVEAU_VD_VPE_SURFACE_QUERY, nouveau_vd_vpe_ioctl_surface_query, DRM_AUTH),
 };
 
 int nouveau_max_ioctl = DRM_ARRAY_SIZE(nouveau_ioctls);

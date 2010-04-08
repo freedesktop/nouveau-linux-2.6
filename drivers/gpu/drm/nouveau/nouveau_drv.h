@@ -489,6 +489,38 @@ struct nv04_mode_state {
 	struct nv04_crtc_reg crtc_reg[2];
 };
 
+struct nouveau_vd_vpe_surface {
+	struct nouveau_bo *luma_bo;
+	struct nouveau_bo *chroma_bo;
+	uint32_t dma_sequence;
+};
+
+struct nouveau_vd_vpe_channel {
+	struct drm_device *dev;
+	struct drm_file *file_priv;
+	uint32_t width;
+	uint32_t height;
+	
+	/* Push buffer state */
+	struct {
+		uint32_t max;
+		uint32_t cur;
+		uint32_t put;
+		uint32_t free;
+		uint32_t sequence;
+		/* access via pushbuf_bo */
+	} dma;
+
+	struct nouveau_bo *pushbuf_bo;
+	struct nouveau_vd_vpe_surface surface[8];
+	
+	struct {
+		bool active;
+		char name[32];
+		struct drm_info_list info;
+	} debugfs;
+};
+
 enum nouveau_card_type {
 	NV_04      = 0x00,
 	NV_10      = 0x10,
@@ -620,7 +652,10 @@ struct drm_nouveau_private {
 
 	struct {
 		struct dentry *channel_root;
+		struct dentry *vpe_channel_root;
 	} debugfs;
+	
+	struct nouveau_vd_vpe_channel *vpe_channel;
 };
 
 static inline struct drm_nouveau_private *
@@ -664,6 +699,16 @@ nouveau_bo_ref(struct nouveau_bo *ref, struct nouveau_bo **pnvbo)
 		return -EPERM;                                   \
 	}                                                        \
 	(ch) = nv->fifos[(id)];                                  \
+} while (0)
+
+#define NOUVEAU_GET_VPE_CHANNEL_WITH_RETURN(id, ch) do {    \
+	struct drm_nouveau_private *nv = dev->dev_private;       \
+	if (nv->vpe_channel && (nv->vpe_channel->file_priv != id) ) {           \
+		NV_ERROR(dev, "pid %d doesn't own vpe channel\n", \
+			 DRM_CURRENTPID);                  \
+		return -EPERM;                                   \
+	}                                                        \
+	(ch) = nv->vpe_channel;                                  \
 } while (0)
 
 /* nouveau_drv.c */
@@ -818,6 +863,8 @@ extern int  nouveau_debugfs_init(struct drm_minor *);
 extern void nouveau_debugfs_takedown(struct drm_minor *);
 extern int  nouveau_debugfs_channel_init(struct nouveau_channel *);
 extern void nouveau_debugfs_channel_fini(struct nouveau_channel *);
+extern int nouveau_debugfs_vpe_channel_init(struct nouveau_vd_vpe_channel *);
+extern void nouveau_debugfs_vpe_channel_fini(struct nouveau_vd_vpe_channel *);
 #else
 static inline int
 nouveau_debugfs_init(struct drm_minor *minor)
@@ -837,6 +884,17 @@ nouveau_debugfs_channel_init(struct nouveau_channel *chan)
 
 static inline void
 nouveau_debugfs_channel_fini(struct nouveau_channel *chan)
+{
+}
+
+static inline int
+nouveau_debugfs_vpe_channel_init(struct nouveau_vd_vpe_channel *chan)
+{
+	return 0;
+}
+
+static inline void
+nouveau_debugfs_vpe_channel_fini(struct nouveau_vd_vpe_channel *chan)
 {
 }
 #endif
@@ -1155,6 +1213,17 @@ extern int nouveau_gem_ioctl_cpu_prep(struct drm_device *, void *,
 extern int nouveau_gem_ioctl_cpu_fini(struct drm_device *, void *,
 				      struct drm_file *);
 extern int nouveau_gem_ioctl_info(struct drm_device *, void *,
+				  struct drm_file *);
+				  			  
+/* nouveau_vd_vpe.c */
+extern void nouveau_vpe_channel_free(struct nouveau_vd_vpe_channel *vpe_channel);
+extern int nouveau_vd_vpe_ioctl_channel_alloc(struct drm_device *, void *,
+				  struct drm_file *);
+extern int nouveau_vd_vpe_ioctl_channel_free(struct drm_device *, void *,
+				  struct drm_file *);
+extern int nouveau_vd_vpe_ioctl_pushbuf_fire(struct drm_device *, void *,
+				  struct drm_file *);
+extern int nouveau_vd_vpe_ioctl_surface_query(struct drm_device *, void *,
 				  struct drm_file *);
 
 /* nv17_gpio.c */

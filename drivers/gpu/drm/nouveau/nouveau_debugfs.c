@@ -115,6 +115,115 @@ nouveau_debugfs_channel_fini(struct nouveau_channel *chan)
 	}
 }
 
+static 
+int nouveau_debugfs_vpe_channel_info(struct seq_file *m, void *data)
+{
+	struct drm_info_node *node = (struct drm_info_node *) m->private;
+	struct nouveau_vd_vpe_channel *chan = node->info_ent->data;
+	int i;
+	uint32_t val;
+	
+	seq_printf(m, "cpu fifo state:\n");
+	seq_printf(m, "           max: 0x%08x\n", chan->dma.max << 2);
+	seq_printf(m, "           cur: 0x%08x\n", chan->dma.cur << 2);
+	seq_printf(m, "           put: 0x%08x\n", chan->dma.put << 2);
+	seq_printf(m, "          free: 0x%08x\n", chan->dma.free << 2);
+					
+	seq_printf(m, "vpe fifo state:\n");
+	seq_printf(m, "           config: 0x%08x\n",
+					nv_rd32(chan->dev, NV_VPE_MPEG2_USER_CONFIG));
+	seq_printf(m, "           offset: 0x%08x\n",
+					nv_rd32(chan->dev, NV_VPE_MPEG2_USER_OFFSET));
+	seq_printf(m, "           size: 0x%08x\n",
+					nv_rd32(chan->dev, NV_VPE_MPEG2_USER_SIZE));
+	seq_printf(m, "           get: 0x%08x\n",
+					nv_rd32(chan->dev, NV_VPE_MPEG2_USER_GET));
+	seq_printf(m, "           put: 0x%08x\n",
+					nv_rd32(chan->dev, NV_VPE_MPEG2_USER_PUT));
+	seq_printf(m, "           get.seq: 0x%08x\n",
+					nv_rd32(chan->dev, NV_VPE_MPEG2_USER_GET));
+	seq_printf(m, "           put.seq: 0x%08x\n",
+					chan->dma.sequence);
+					
+	seq_printf(m, "vpe engine status:\n");
+	seq_printf(m, "           engine_config_1: 0x%08x\n",
+					nv_rd32(chan->dev, NV_VPE_MPEG2_ENGINE_CONFIG_1));
+	seq_printf(m, "           engine_config_2: 0x%08x\n",
+					nv_rd32(chan->dev, NV_VPE_MPEG2_ENGINE_CONFIG_2));
+	seq_printf(m, "           engine_setup_1: 0x%08x\n",
+					nv_rd32(chan->dev, NV_VPE_MPEG2_ENGINE_SETUP_1));
+	seq_printf(m, "           engine_setup_2: 0x%08x\n",
+					nv_rd32(chan->dev, NV_VPE_MPEG2_ENGINE_SETUP_2));
+	seq_printf(m, "           engine_reader_config: 0x%08x\n",
+					nv_rd32(chan->dev, NV_VPE_MPEG2_ENGINE_READER_CONFIG));
+	seq_printf(m, "           engine_status: 0x%08x\n",
+					nv_rd32(chan->dev, NV_VPE_MPEG2_ENGINE_STATUS));
+	
+	seq_printf(m, "vpe decode surface config:\n");
+	val = nv_rd32(chan->dev, NV_VPE_MPEG2_SURFACE_INFO);
+	seq_printf(m, "           info: 0x%08X\n",
+					val);
+	val = nv_rd32(chan->dev, NV_VPE_MPEG2_CONTEXT_DIMENSIONS);
+	seq_printf(m, "           dimensions: width = %d, height = %d\n",
+					(val >> 16) & 0xFFF, val & 0xFFF);
+					
+	seq_printf(m, "vpe decode surface fb offsets:\n");				
+	for (i = 0; i < ARRAY_SIZE(chan->surface); i++) {
+		seq_printf(m, "         luma.[0x%08X] = 0x%08X\n",
+					i, nv_rd32(chan->dev, NV_VPE_MPEG2_LUMA_SURFACE_OFFSET_GET(i)));
+		seq_printf(m, "       chroma.[0x%08X] = 0x%08X\n",
+					i, nv_rd32(chan->dev, NV_VPE_MPEG2_CHROMA_SURFACE_OFFSET_GET(i)));
+	}
+					
+	return 0;
+}
+
+int nouveau_debugfs_vpe_channel_init(struct nouveau_vd_vpe_channel *chan)
+{
+	struct drm_nouveau_private *dev_priv = chan->dev->dev_private;
+	struct drm_minor *minor = chan->dev->primary;
+	int ret;
+
+	if (!dev_priv->debugfs.vpe_channel_root) {
+		dev_priv->debugfs.vpe_channel_root =
+			debugfs_create_dir("vpe_channel", minor->debugfs_root);
+		if (!dev_priv->debugfs.vpe_channel_root)
+			return -ENOENT;
+	}
+
+	strcpy(chan->debugfs.name, "0");
+	chan->debugfs.info.name = chan->debugfs.name;
+	chan->debugfs.info.show = nouveau_debugfs_vpe_channel_info;
+	chan->debugfs.info.driver_features = 0;
+	chan->debugfs.info.data = chan;
+
+	ret = drm_debugfs_create_files(&chan->debugfs.info, 1,
+				       dev_priv->debugfs.vpe_channel_root,
+				       chan->dev->primary);
+	if (ret == 0)
+		chan->debugfs.active = true;
+	return ret;
+}
+
+void
+nouveau_debugfs_vpe_channel_fini(struct nouveau_vd_vpe_channel *chan)
+{
+	struct drm_nouveau_private *dev_priv = chan->dev->dev_private;
+
+	if (!chan->debugfs.active)
+		return;
+
+	drm_debugfs_remove_files(&chan->debugfs.info, 1, chan->dev->primary);
+	chan->debugfs.active = false;
+
+	if (chan == dev_priv->vpe_channel) {
+		debugfs_remove(dev_priv->debugfs.vpe_channel_root);
+		dev_priv->debugfs.vpe_channel_root = NULL;
+	}
+}
+
+
+
 static int
 nouveau_debugfs_chipset_info(struct seq_file *m, void *data)
 {

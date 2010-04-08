@@ -131,6 +131,37 @@
 #define NV04_PTIMER_TIME_1                                 0x00009410
 #define NV04_PTIMER_ALARM_0                                0x00009420
 
+/* The NV VPE MPEG2 control registers that exist on NV40 and NV30 and 
+ * some other older boards possibly.*/
+#define NV_VPE_MPEG2_ENGINE_CONFIG_1      				   0x0000B0E0
+#define NV_VPE_MPEG2_ENGINE_CONFIG_2      				   0x0000B0E8
+#define NV_VPE_MPEG2_ENGINE_SETUP_1       				   0x0000B100 
+#define NV_VPE_MPEG2_ENGINE_SETUP_2       				   0x0000B140 
+#define NV_VPE_MPEG2_ENGINE_STATUS        				   0x0000B200 
+#define NV_VPE_MPEG2_ENGINE_READER_CONFIG 				   0x0000B204   
+#define NV_VPE_MPEG2_USER_CONFIG  		   		           0x0000B300
+#	define NV_VPE_MPEG2_USER_NOT_PRESENT     	           0x020F0200
+#	define NV_VPE_MPEG2_USER_PRESENT     	                0x02001ec1 
+#	define NV_VPE_MPEG2_USER_VRAM                           (0 << 16)
+#	define NV_VPE_MPEG2_USER_AGP_OR_PCI                     (1 << 16)
+#	define NV_VPE_MPEG2_USER_AGP_OR_PCI_READY               (2 << 16)
+/* Complete guess here about pcie.*/	      
+#	define NV_VPE_MPEG2_USER_PCIE                           (8 << 16)
+#define NV_VPE_MPEG2_UNKNOWN_SETUP_3 					   0x0000B314
+#define NV_VPE_MPEG2_USER_OFFSET 				   	       0x0000B320
+#define NV_VPE_MPEG2_USER_SIZE     				           0x0000B324
+#define NV_VPE_MPEG2_USER_PUT      				           0x0000B328
+#define NV_VPE_MPEG2_USER_GET      				           0x0000B330
+#define NV_VPE_MPEG2_ENGINE_CONTROL      				   0x0000B32C
+#	define NV_VPE_MPEG2_ENGINE_STOP   				     0
+#	define NV_VPE_MPEG2_ENGINE_START  				   	 1      
+#define NV_VPE_MPEG2_SEQUENCE_GET        				   0x0000B340
+#define NV_VPE_MPEG2_SURFACE_INFO        				   0x0000B378
+#define NV_VPE_MPEG2_CONTEXT_DIMENSIONS 				   0x0000B37C	    
+#define NV_VPE_MPEG2_LUMA_SURFACE_OFFSET_GET(surface)	   (0x0000B450 + (surface * 8) )
+#define NV_VPE_MPEG2_CHROMA_SURFACE_OFFSET_GET(surface)    (0x0000B454 + (surface * 8) )	
+#define NV_VPE_MPEG2_ENGINE_STATUS_1  					   0x0000B848
+
 #define NV04_PFB_CFG0                                      0x00100200
 #define NV04_PFB_CFG1                                      0x00100204
 #define NV40_PFB_020C                                      0x0010020C

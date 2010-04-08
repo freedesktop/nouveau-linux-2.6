@@ -183,6 +183,52 @@ enum nouveau_bus_type {
 struct drm_nouveau_sarea {
 };
 
+/* VPE Supports mpeg2 only.*/
+struct drm_nouveau_vd_vpe_channel_alloc {
+	uint32_t width;
+	uint32_t height;
+	/* Used for user pushbuf access.
+	 * mmio access is not allowed so you still need to fire as normal.*/
+	uint32_t pushbuf_handle;
+};
+
+struct drm_nouveau_vd_vpe_channel_free {
+};
+
+#define NOUVEAU_VD_VPE_PUSHBUF_FIRE_FLAG_END_SEQUENCE   0x00000001
+#define NOUVEAU_VD_VPE_PUSHBUF_FIRE_FLAG_UPDATE_DMA_POS 0x00000002
+/* structure for surface.*/
+struct drm_nouveau_vd_vpe_surface {
+	uint32_t luma_handle;
+	uint32_t chroma_handle;
+	uint32_t surface_index;
+};
+
+/* This flag lets you turn off firing for a specific batch. 
+ * This is needed in some cases to avoid locking up the decoder.*/
+#define NOUVEAU_VD_VPE_PUSHBUF_FIRE_BATCH_DO_NOT_FIRE  0x10000000
+struct drm_nouveau_vd_vpe_pushbuf_fire {
+	/* [in] */
+	uint32_t nr_dwords;
+	uint64_t dwords;
+	uint32_t nr_batches;
+	uint64_t batches;
+	/* Surface[0] is always the target.*/
+	uint32_t nr_surfaces;
+	uint64_t surfaces;
+	uint32_t flags;
+	/* Needed when writing to the hw pushbuf from user space.
+	 * This also will perform a fire.*/
+	uint32_t dma_cur;
+	/* [out] */
+	uint32_t dma_free;
+};
+
+struct drm_nouveau_vd_vpe_surface_query {
+	uint32_t surface_index;
+	uint32_t is_busy;
+};
+
 #define DRM_NOUVEAU_GETPARAM           0x00
 #define DRM_NOUVEAU_SETPARAM           0x01
 #define DRM_NOUVEAU_CHANNEL_ALLOC      0x02
@@ -195,5 +241,9 @@ struct drm_nouveau_sarea {
 #define DRM_NOUVEAU_GEM_CPU_PREP       0x42
 #define DRM_NOUVEAU_GEM_CPU_FINI       0x43
 #define DRM_NOUVEAU_GEM_INFO           0x44
+#define DRM_NOUVEAU_VD_VPE_CHANNEL_ALLOC  0x49
+#define DRM_NOUVEAU_VD_VPE_CHANNEL_FREE   0x50
+#define DRM_NOUVEAU_VD_VPE_PUSHBUF_FIRE   0x51
+#define DRM_NOUVEAU_VD_VPE_SURFACE_QUERY  0x52
 
 #endif /* __NOUVEAU_DRM_H__ */
