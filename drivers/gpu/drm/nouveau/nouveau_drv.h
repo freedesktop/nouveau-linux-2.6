@@ -924,6 +924,10 @@ extern void nv40_fb_set_region_tiling(struct drm_device *, int, uint32_t,
 extern int  nv50_fb_init(struct drm_device *);
 extern void nv50_fb_takedown(struct drm_device *);
 
+/* nv50_fb.c */
+extern int  nv50_fb_init(struct drm_device *);
+extern void nv50_fb_takedown(struct drm_device *);
+
 /* nv04_fifo.c */
 extern int  nv04_fifo_init(struct drm_device *);
 extern void nv04_fifo_disable(struct drm_device *);
