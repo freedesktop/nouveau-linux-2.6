@@ -978,6 +978,8 @@ nv50_display_irq_hotplug_bh(struct work_struct *work)
 	nv_wr32(dev, 0xe054, nv_rd32(dev, 0xe054));
 	if (dev_priv->chipset >= 0x90)
 		nv_wr32(dev, 0xe074, nv_rd32(dev, 0xe074));
+
+	drm_sysfs_hotplug_event(dev);
 }
 
 void
