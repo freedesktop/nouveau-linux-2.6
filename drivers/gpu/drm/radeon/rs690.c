@@ -48,8 +48,6 @@ static int rs690_mc_wait_for_idle(struct radeon_device *rdev)
 
 static void rs690_gpu_init(struct radeon_device *rdev)
 {
-	/* FIXME: HDP same place on rs690 ? */
-	r100_hdp_reset(rdev);
 	/* FIXME: is this correct ? */
 	r420_pipes_init(rdev);
 	if (rs690_mc_wait_for_idle(rdev)) {
@@ -653,7 +651,7 @@ int rs690_resume(struct radeon_device *rdev)
 	/* Resume clock before doing reset */
 	rv515_clock_startup(rdev);
 	/* Reset gpu before posting otherwise ATOM will enter infinite loop */
-	if (radeon_gpu_reset(rdev)) {
+	if (radeon_asic_reset(rdev)) {
 		dev_warn(rdev->dev, "GPU reset failed ! (0xE40=0x%08X, 0x7C0=0x%08X)\n",
 			RREG32(R_000E40_RBBM_STATUS),
 			RREG32(R_0007C0_CP_STAT));
@@ -678,7 +676,6 @@ int rs690_suspend(struct radeon_device *rdev)
 
 void rs690_fini(struct radeon_device *rdev)
 {
-	radeon_pm_fini(rdev);
 	r100_cp_fini(rdev);
 	r100_wb_fini(rdev);
 	r100_ib_fini(rdev);
@@ -717,7 +714,7 @@ int rs690_init(struct radeon_device *rdev)
 		return -EINVAL;
 	}
 	/* Reset gpu before posting otherwise ATOM will enter infinite loop */
-	if (radeon_gpu_reset(rdev)) {
+	if (radeon_asic_reset(rdev)) {
 		dev_warn(rdev->dev,
 			"GPU reset failed ! (0xE40=0x%08X, 0x7C0=0x%08X)\n",
 			RREG32(R_000E40_RBBM_STATUS),
@@ -729,8 +726,6 @@ int rs690_init(struct radeon_device *rdev)
 
 	/* Initialize clocks */
 	radeon_get_clock_info(rdev->ddev);
-	/* Initialize power management */
-	radeon_pm_init(rdev);
 	/* initialize memory controller */
 	rs690_mc_init(rdev);
 	rv515_debugfs(rdev);

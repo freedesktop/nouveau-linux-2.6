@@ -357,7 +357,8 @@ nouveau_connector_detect_lvds(struct drm_connector *connector)
 	}
 
 out:
-#ifdef CONFIG_ACPI
+#if defined(CONFIG_ACPI_BUTTON) || \
+	(defined(CONFIG_ACPI_BUTTON_MODULE) && defined(MODULE))
 	if (status == connector_status_connected &&
 	    !nouveau_ignorelid && !acpi_lid_open())
 		status = connector_status_unknown;
@@ -839,6 +840,7 @@ nouveau_connector_create(struct drm_device *dev,
 
 	switch (dcb->type) {
 	case DCB_CONNECTOR_VGA:
+		connector->polled = DRM_CONNECTOR_POLL_CONNECT;
 		if (dev_priv->card_type >= NV_50) {
 			drm_connector_attach_property(connector,
 					dev->mode_config.scaling_mode_property,
@@ -850,6 +852,17 @@ nouveau_connector_create(struct drm_device *dev,
 	case DCB_CONNECTOR_TV_3:
 		nv_connector->scaling_mode = DRM_MODE_SCALE_NONE;
 		break;
+	case DCB_CONNECTOR_DP:
+	case DCB_CONNECTOR_eDP:
+	case DCB_CONNECTOR_HDMI_0:
+	case DCB_CONNECTOR_HDMI_1:
+	case DCB_CONNECTOR_DVI_I:
+	case DCB_CONNECTOR_DVI_D:
+		if (dev_priv->card_type >= NV_50)
+			connector->polled = DRM_CONNECTOR_POLL_HPD;
+		else
+			connector->polled = DRM_CONNECTOR_POLL_CONNECT;
+		/* fall-through */
 	default:
 		nv_connector->scaling_mode = DRM_MODE_SCALE_FULLSCREEN;
 
