@@ -500,6 +500,7 @@ int nv50_display_create(struct drm_device *dev)
 	/* We setup the encoders from the BIOS table */
 	for (i = 0 ; i < dcb->entries; i++) {
 		struct dcb_entry *entry = &dcb->entry[i];
+		struct drm_connector *connector;
 
 		if (entry->location != DCB_LOC_ON_CHIP) {
 			NV_WARN(dev, "Off-chip encoder %d/%d unsupported\n",
@@ -507,26 +508,23 @@ int nv50_display_create(struct drm_device *dev)
 			continue;
 		}
 
+		connector = nouveau_connector_create(dev, entry->connector);
+		if (IS_ERR(connector))
+			continue;
+
 		switch (entry->type) {
 		case OUTPUT_TMDS:
 		case OUTPUT_LVDS:
 		case OUTPUT_DP:
-			nv50_sor_create(dev, entry);
+			nv50_sor_create(connector, entry);
 			break;
 		case OUTPUT_ANALOG:
-			nv50_dac_create(dev, entry);
+			nv50_dac_create(connector, entry);
 			break;
 		default:
 			NV_WARN(dev, "DCB encoder %d unknown\n", entry->type);
 			continue;
 		}
-	}
-
-	for (i = 0 ; i < dcb->connector.entries; i++) {
-		if (i != 0 && dcb->connector.entry[i].index2 ==
-			      dcb->connector.entry[i - 1].index2)
-			continue;
-		nouveau_connector_create(dev, &dcb->connector.entry[i]);
 	}
 
 	ret = nv50_display_init(dev);
