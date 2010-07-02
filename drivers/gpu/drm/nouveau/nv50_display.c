@@ -465,6 +465,7 @@ int nv50_display_create(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct dcb_table *dcb = &dev_priv->vbios.dcb;
+	struct drm_connector *connector, *ct;
 	int ret, i;
 
 	NV_DEBUG_KMS(dev, "\n");
@@ -500,7 +501,6 @@ int nv50_display_create(struct drm_device *dev)
 	/* We setup the encoders from the BIOS table */
 	for (i = 0 ; i < dcb->entries; i++) {
 		struct dcb_entry *entry = &dcb->entry[i];
-		struct drm_connector *connector;
 
 		if (entry->location != DCB_LOC_ON_CHIP) {
 			NV_WARN(dev, "Off-chip encoder %d/%d unsupported\n",
@@ -524,6 +524,15 @@ int nv50_display_create(struct drm_device *dev)
 		default:
 			NV_WARN(dev, "DCB encoder %d unknown\n", entry->type);
 			continue;
+		}
+	}
+
+	list_for_each_entry_safe(connector, ct,
+				 &dev->mode_config.connector_list, head) {
+		if (!connector->encoder_ids[0]) {
+			NV_WARN(dev, "%s has no encoders, removing\n",
+				drm_get_connector_name(connector));
+			connector->funcs->destroy(connector);
 		}
 	}
 
