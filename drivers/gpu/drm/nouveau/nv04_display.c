@@ -94,6 +94,7 @@ nv04_display_create(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct dcb_table *dcb = &dev_priv->vbios.dcb;
+	struct drm_connector *connector, *ct;
 	struct drm_encoder *encoder;
 	struct drm_crtc *crtc;
 	int i, ret;
@@ -131,7 +132,6 @@ nv04_display_create(struct drm_device *dev)
 
 	for (i = 0; i < dcb->entries; i++) {
 		struct dcb_entry *dcbent = &dcb->entry[i];
-		struct drm_connector *connector;
 
 		connector = nouveau_connector_create(dev, dcbent->connector);
 		if (IS_ERR(connector))
@@ -158,6 +158,15 @@ nv04_display_create(struct drm_device *dev)
 
 		if (ret)
 			continue;
+	}
+
+	list_for_each_entry_safe(connector, ct,
+				 &dev->mode_config.connector_list, head) {
+		if (!connector->encoder_ids[0]) {
+			NV_WARN(dev, "%s has no encoders, removing\n",
+				drm_get_connector_name(connector));
+			connector->funcs->destroy(connector);
+		}
 	}
 
 	/* Save previous state */
