@@ -249,10 +249,10 @@ nouveau_mem_close(struct drm_device *dev)
 		dev->agp->enabled = 0;
 	}
 
-	if (dev_priv->fb_mtrr) {
+	if (dev_priv->fb_mtrr >= 0) {
 		drm_mtrr_del(dev_priv->fb_mtrr, drm_get_resource_start(dev, 1),
 			     drm_get_resource_len(dev, 1), DRM_MTRR_WC);
-		dev_priv->fb_mtrr = 0;
+		dev_priv->fb_mtrr = -1;
 	}
 }
 
