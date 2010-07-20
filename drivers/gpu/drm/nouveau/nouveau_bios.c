@@ -6606,7 +6606,6 @@ static bool
 nouveau_bios_posted(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
-	bool was_locked;
 	unsigned htotal;
 
 	if (dev_priv->chipset >= NV_50) {
@@ -6616,13 +6615,14 @@ nouveau_bios_posted(struct drm_device *dev)
 		return true;
 	}
 
-	was_locked = NVLockVgaCrtcs(dev, false);
+	NVLockVgaCrtcs(dev, false);
 	htotal  = NVReadVgaCrtc(dev, 0, 0x06);
 	htotal |= (NVReadVgaCrtc(dev, 0, 0x07) & 0x01) << 8;
 	htotal |= (NVReadVgaCrtc(dev, 0, 0x07) & 0x20) << 4;
 	htotal |= (NVReadVgaCrtc(dev, 0, 0x25) & 0x01) << 10;
 	htotal |= (NVReadVgaCrtc(dev, 0, 0x41) & 0x01) << 11;
-	NVLockVgaCrtcs(dev, was_locked);
+	NVLockVgaCrtcs(dev, true);
+
 	return (htotal != 0);
 }
 
@@ -6631,7 +6631,6 @@ nouveau_bios_init(struct drm_device *dev)
 {
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nvbios *bios = &dev_priv->vbios;
-	bool was_locked;
 	int ret;
 
 	if (!NVInitVBIOS(dev))
@@ -6666,14 +6665,14 @@ nouveau_bios_init(struct drm_device *dev)
 		return ret;
 
 	/* feature_byte on BMP is poor, but init always sets CR4B */
-	was_locked = NVLockVgaCrtcs(dev, false);
+	NVLockVgaCrtcs(dev, false);
 	if (bios->major_version < 5)
 		bios->is_mobile = NVReadVgaCrtc(dev, 0, NV_CIO_CRE_4B) & 0x40;
 
 	/* all BIT systems need p_f_m_t for digital_min_front_porch */
 	if (bios->is_mobile || bios->major_version >= 5)
 		ret = parse_fp_mode_table(dev, bios);
-	NVLockVgaCrtcs(dev, was_locked);
+	NVLockVgaCrtcs(dev, true);
 
 	/* allow subsequent scripts to execute */
 	bios->execute = true;
