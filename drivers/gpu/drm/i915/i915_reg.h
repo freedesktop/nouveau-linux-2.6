@@ -178,6 +178,7 @@
 #define   MI_OVERLAY_OFF	(0x2<<21)
 #define MI_LOAD_SCAN_LINES_INCL MI_INSTR(0x12, 0)
 #define MI_DISPLAY_FLIP		MI_INSTR(0x14, 2)
+#define MI_DISPLAY_FLIP_I915	MI_INSTR(0x14, 1)
 #define   MI_DISPLAY_FLIP_PLANE(n) ((n) << 20)
 #define MI_STORE_DWORD_IMM	MI_INSTR(0x20, 1)
 #define   MI_MEM_VIRTUAL	(1 << 22) /* 965+ only */
@@ -358,6 +359,70 @@
 #define LM_BURST_LENGTH     0x00000700
 #define LM_FIFO_WATERMARK   0x0000001F
 #define MI_ARB_STATE	0x020e4 /* 915+ only */
+#define   MI_ARB_MASK_SHIFT	  16	/* shift for enable bits */
+
+/* Make render/texture TLB fetches lower priorty than associated data
+ *   fetches. This is not turned on by default
+ */
+#define   MI_ARB_RENDER_TLB_LOW_PRIORITY	(1 << 15)
+
+/* Isoch request wait on GTT enable (Display A/B/C streams).
+ * Make isoch requests stall on the TLB update. May cause
+ * display underruns (test mode only)
+ */
+#define   MI_ARB_ISOCH_WAIT_GTT			(1 << 14)
+
+/* Block grant count for isoch requests when block count is
+ * set to a finite value.
+ */
+#define   MI_ARB_BLOCK_GRANT_MASK		(3 << 12)
+#define   MI_ARB_BLOCK_GRANT_8			(0 << 12)	/* for 3 display planes */
+#define   MI_ARB_BLOCK_GRANT_4			(1 << 12)	/* for 2 display planes */
+#define   MI_ARB_BLOCK_GRANT_2			(2 << 12)	/* for 1 display plane */
+#define   MI_ARB_BLOCK_GRANT_0			(3 << 12)	/* don't use */
+
+/* Enable render writes to complete in C2/C3/C4 power states.
+ * If this isn't enabled, render writes are prevented in low
+ * power states. That seems bad to me.
+ */
+#define   MI_ARB_C3_LP_WRITE_ENABLE		(1 << 11)
+
+/* This acknowledges an async flip immediately instead
+ * of waiting for 2TLB fetches.
+ */
+#define   MI_ARB_ASYNC_FLIP_ACK_IMMEDIATE	(1 << 10)
+
+/* Enables non-sequential data reads through arbiter
+ */
+#define   MI_ARB_DUAL_DATA_PHASE_DISABLE       	(1 << 9)
+
+/* Disable FSB snooping of cacheable write cycles from binner/render
+ * command stream
+ */
+#define   MI_ARB_CACHE_SNOOP_DISABLE		(1 << 8)
+
+/* Arbiter time slice for non-isoch streams */
+#define   MI_ARB_TIME_SLICE_MASK		(7 << 5)
+#define   MI_ARB_TIME_SLICE_1			(0 << 5)
+#define   MI_ARB_TIME_SLICE_2			(1 << 5)
+#define   MI_ARB_TIME_SLICE_4			(2 << 5)
+#define   MI_ARB_TIME_SLICE_6			(3 << 5)
+#define   MI_ARB_TIME_SLICE_8			(4 << 5)
+#define   MI_ARB_TIME_SLICE_10			(5 << 5)
+#define   MI_ARB_TIME_SLICE_14			(6 << 5)
+#define   MI_ARB_TIME_SLICE_16			(7 << 5)
+
+/* Low priority grace period page size */
+#define   MI_ARB_LOW_PRIORITY_GRACE_4KB		(0 << 4)	/* default */
+#define   MI_ARB_LOW_PRIORITY_GRACE_8KB		(1 << 4)
+
+/* Disable display A/B trickle feed */
+#define   MI_ARB_DISPLAY_TRICKLE_FEED_DISABLE	(1 << 2)
+
+/* Set display plane priority */
+#define   MI_ARB_DISPLAY_PRIORITY_A_B		(0 << 0)	/* display A > display B */
+#define   MI_ARB_DISPLAY_PRIORITY_B_A		(1 << 0)	/* display B > display A */
+
 #define CACHE_MODE_0	0x02120 /* 915+ only */
 #define   CM0_MASK_SHIFT          16
 #define   CM0_IZ_OPT_DISABLE      (1<<6)
@@ -368,13 +433,16 @@
 #define   CM0_RC_OP_FLUSH_DISABLE (1<<0)
 #define BB_ADDR		0x02140 /* 8 bytes */
 #define GFX_FLSH_CNTL	0x02170 /* 915+ only */
+#define ECOSKPD		0x021d0
+#define   ECO_GATING_CX_ONLY	(1<<3)
+#define   ECO_FLIP_DONE		(1<<0)
 
 /* GEN6 interrupt control */
 #define GEN6_RENDER_HWSTAM	0x2098
 #define GEN6_RENDER_IMR		0x20a8
 #define   GEN6_RENDER_CONTEXT_SWITCH_INTERRUPT		(1 << 8)
 #define   GEN6_RENDER_PPGTT_PAGE_FAULT			(1 << 7)
-#define   GEN6_RENDER TIMEOUT_COUNTER_EXPIRED		(1 << 6)
+#define   GEN6_RENDER_TIMEOUT_COUNTER_EXPIRED		(1 << 6)
 #define   GEN6_RENDER_L3_PARITY_ERROR			(1 << 5)
 #define   GEN6_RENDER_PIPE_CONTROL_NOTIFY_INTERRUPT	(1 << 4)
 #define   GEN6_RENDER_COMMAND_PARSER_MASTER_ERROR	(1 << 3)
@@ -462,6 +530,21 @@
 #define DPFC_CHICKEN		0x3224
 #define   DPFC_HT_MODIFY	(1<<31)
 
+/* Framebuffer compression for Ironlake */
+#define ILK_DPFC_CB_BASE	0x43200
+#define ILK_DPFC_CONTROL	0x43208
+/* The bit 28-8 is reserved */
+#define   DPFC_RESERVED		(0x1FFFFF00)
+#define ILK_DPFC_RECOMP_CTL	0x4320c
+#define ILK_DPFC_STATUS		0x43210
+#define ILK_DPFC_FENCE_YOFF	0x43218
+#define ILK_DPFC_CHICKEN	0x43224
+#define ILK_FBC_RT_BASE		0x2128
+#define   ILK_FBC_RT_VALID	(1<<0)
+
+#define ILK_DISPLAY_CHICKEN1	0x42000
+#define   ILK_FBCQ_DIS		(1<<22)
+
 /*
  * GPIO regs
  */
@@ -526,32 +609,6 @@
 #define   DPLL_P2_CLOCK_DIV_MASK	0x03000000 /* i915 */
 #define   DPLL_FPA01_P1_POST_DIV_MASK	0x00ff0000 /* i915 */
 #define   DPLL_FPA01_P1_POST_DIV_MASK_PINEVIEW	0x00ff8000 /* Pineview */
-
-#define I915_FIFO_UNDERRUN_STATUS		(1UL<<31)
-#define I915_CRC_ERROR_ENABLE			(1UL<<29)
-#define I915_CRC_DONE_ENABLE			(1UL<<28)
-#define I915_GMBUS_EVENT_ENABLE			(1UL<<27)
-#define I915_VSYNC_INTERRUPT_ENABLE		(1UL<<25)
-#define I915_DISPLAY_LINE_COMPARE_ENABLE	(1UL<<24)
-#define I915_DPST_EVENT_ENABLE			(1UL<<23)
-#define I915_LEGACY_BLC_EVENT_ENABLE		(1UL<<22)
-#define I915_ODD_FIELD_INTERRUPT_ENABLE		(1UL<<21)
-#define I915_EVEN_FIELD_INTERRUPT_ENABLE	(1UL<<20)
-#define I915_START_VBLANK_INTERRUPT_ENABLE	(1UL<<18)	/* 965 or later */
-#define I915_VBLANK_INTERRUPT_ENABLE		(1UL<<17)
-#define I915_OVERLAY_UPDATED_ENABLE		(1UL<<16)
-#define I915_CRC_ERROR_INTERRUPT_STATUS		(1UL<<13)
-#define I915_CRC_DONE_INTERRUPT_STATUS		(1UL<<12)
-#define I915_GMBUS_INTERRUPT_STATUS		(1UL<<11)
-#define I915_VSYNC_INTERRUPT_STATUS		(1UL<<9)
-#define I915_DISPLAY_LINE_COMPARE_STATUS	(1UL<<8)
-#define I915_DPST_EVENT_STATUS			(1UL<<7)
-#define I915_LEGACY_BLC_EVENT_STATUS		(1UL<<6)
-#define I915_ODD_FIELD_INTERRUPT_STATUS		(1UL<<5)
-#define I915_EVEN_FIELD_INTERRUPT_STATUS	(1UL<<4)
-#define I915_START_VBLANK_INTERRUPT_STATUS	(1UL<<2)	/* 965 or later */
-#define I915_VBLANK_INTERRUPT_STATUS		(1UL<<1)
-#define I915_OVERLAY_UPDATED_STATUS		(1UL<<0)
 
 #define SRX_INDEX		0x3c4
 #define SRX_DATA		0x3c5
@@ -1130,7 +1187,6 @@
 #define CRT_HOTPLUG_DETECT_DELAY_2G		(1 << 4)
 #define CRT_HOTPLUG_DETECT_VOLTAGE_325MV	(0 << 2)
 #define CRT_HOTPLUG_DETECT_VOLTAGE_475MV	(1 << 2)
-#define CRT_HOTPLUG_MASK			(0x3fc) /* Bits 9-2 */
 
 #define PORT_HOTPLUG_STAT	0x61114
 #define   HDMIB_HOTPLUG_INT_STATUS		(1 << 29)
@@ -2099,7 +2155,8 @@
 #define I830_FIFO_LINE_SIZE	32
 
 #define G4X_FIFO_SIZE		127
-#define I945_FIFO_SIZE		127 /* 945 & 965 */
+#define I965_FIFO_SIZE		512
+#define I945_FIFO_SIZE		127
 #define I915_FIFO_SIZE		95
 #define I855GM_FIFO_SIZE	127 /* In cachelines */
 #define I830_FIFO_SIZE		95
@@ -2118,6 +2175,9 @@
 #define PINEVIEW_CURSOR_DFT_WM	0
 #define PINEVIEW_CURSOR_GUARD_WM	5
 
+#define I965_CURSOR_FIFO	64
+#define I965_CURSOR_MAX_WM	32
+#define I965_CURSOR_DFT_WM	8
 
 /* define the Watermark register on Ironlake */
 #define WM0_PIPEA_ILK		0x45100
@@ -2145,6 +2205,9 @@
 #define ILK_DISPLAY_FIFO	128
 #define ILK_DISPLAY_MAXWM	64
 #define ILK_DISPLAY_DFTWM	8
+#define ILK_CURSOR_FIFO		32
+#define ILK_CURSOR_MAXWM	16
+#define ILK_CURSOR_DFTWM	8
 
 #define ILK_DISPLAY_SR_FIFO	512
 #define ILK_DISPLAY_MAX_SRWM	0x1ff
@@ -2443,6 +2506,10 @@
 #define  ILK_VSDPFD_FULL	(1<<21)
 #define ILK_DSPCLK_GATE		0x42020
 #define  ILK_DPARB_CLK_GATE	(1<<5)
+/* According to spec this bit 7/8/9 of 0x42020 should be set to enable FBC */
+#define   ILK_CLK_FBC		(1<<7)
+#define   ILK_DPFC_DIS1		(1<<8)
+#define   ILK_DPFC_DIS2		(1<<9)
 
 #define DISP_ARB_CTL	0x45000
 #define  DISP_TILE_SURFACE_SWIZZLING	(1<<13)
@@ -2802,6 +2869,7 @@
 
 #define PCH_PP_STATUS		0xc7200
 #define PCH_PP_CONTROL		0xc7204
+#define  PANEL_UNLOCK_REGS	(0xabcd << 16)
 #define  EDP_FORCE_VDD		(1 << 3)
 #define  EDP_BLC_ENABLE		(1 << 2)
 #define  PANEL_POWER_RESET	(1 << 1)

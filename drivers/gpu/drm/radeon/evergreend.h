@@ -165,6 +165,11 @@
 #define		SE_DB_BUSY					(1 << 30)
 #define		SE_CB_BUSY					(1 << 31)
 
+#define	CG_MULT_THERMAL_STATUS				0x740
+#define		ASIC_T(x)			        ((x) << 16)
+#define		ASIC_T_MASK			        0x7FF0000
+#define		ASIC_T_SHIFT			        16
+
 #define	HDP_HOST_PATH_CNTL				0x2C00
 #define	HDP_NONSURFACE_BASE				0x2C04
 #define	HDP_NONSURFACE_INFO				0x2C08
@@ -712,6 +717,9 @@
 #define SQ_GSVS_RING_OFFSET_1				0x2892c
 #define SQ_GSVS_RING_OFFSET_2				0x28930
 #define SQ_GSVS_RING_OFFSET_3				0x28934
+
+#define SQ_ALU_CONST_BUFFER_SIZE_PS_0			0x28140
+#define SQ_ALU_CONST_BUFFER_SIZE_HS_0			0x28f80
 
 #define SQ_ALU_CONST_CACHE_PS_0				0x28940
 #define SQ_ALU_CONST_CACHE_PS_1				0x28944

@@ -284,7 +284,7 @@ retry:
 		if (!gem) {
 			NV_ERROR(dev, "Unknown handle 0x%08x\n", b->handle);
 			validate_fini(op, NULL);
-			return -EINVAL;
+			return -ENOENT;
 		}
 		nvbo = gem->driver_private;
 
@@ -775,7 +775,7 @@ nouveau_gem_ioctl_cpu_prep(struct drm_device *dev, void *data,
 
 	gem = drm_gem_object_lookup(dev, file_priv, req->handle);
 	if (!gem)
-		return ret;
+		return -ENOENT;
 	nvbo = nouveau_gem_object(gem);
 
 	if (nvbo->cpu_filp) {
@@ -813,7 +813,7 @@ nouveau_gem_ioctl_cpu_fini(struct drm_device *dev, void *data,
 
 	gem = drm_gem_object_lookup(dev, file_priv, req->handle);
 	if (!gem)
-		return ret;
+		return -ENOENT;
 	nvbo = nouveau_gem_object(gem);
 
 	if (nvbo->cpu_filp != file_priv)
@@ -838,7 +838,7 @@ nouveau_gem_ioctl_info(struct drm_device *dev, void *data,
 
 	gem = drm_gem_object_lookup(dev, file_priv, req->handle);
 	if (!gem)
-		return -EINVAL;
+		return -ENOENT;
 
 	ret = nouveau_gem_info(gem, req);
 	drm_gem_object_unreference_unlocked(gem);

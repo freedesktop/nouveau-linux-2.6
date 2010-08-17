@@ -27,10 +27,6 @@ enum writeback_sync_modes {
  * in a manner such that unspecified fields are set to zero.
  */
 struct writeback_control {
-	struct backing_dev_info *bdi;	/* If !NULL, only write back this
-					   queue */
-	struct super_block *sb;		/* if !NULL, only write inodes from
-					   this super_block */
 	enum writeback_sync_modes sync_mode;
 	unsigned long *older_than_this;	/* If !NULL, only write back inodes
 					   older than this */
@@ -66,7 +62,8 @@ int inode_wait(void *);
 void writeback_inodes_sb(struct super_block *);
 int writeback_inodes_sb_if_idle(struct super_block *);
 void sync_inodes_sb(struct super_block *);
-void writeback_inodes_wbc(struct writeback_control *wbc);
+void writeback_inodes_wb(struct bdi_writeback *wb,
+		struct writeback_control *wbc);
 long wb_do_writeback(struct bdi_writeback *wb, int force_wait);
 void wakeup_flusher_threads(long nr_pages);
 
@@ -127,8 +124,9 @@ struct ctl_table;
 int dirty_writeback_centisecs_handler(struct ctl_table *, int,
 				      void __user *, size_t *, loff_t *);
 
-void get_dirty_limits(unsigned long *pbackground, unsigned long *pdirty,
-		      unsigned long *pbdi_dirty, struct backing_dev_info *bdi);
+void global_dirty_limits(unsigned long *pbackground, unsigned long *pdirty);
+unsigned long bdi_dirty_limit(struct backing_dev_info *bdi,
+			       unsigned long dirty);
 
 void page_writeback_init(void);
 void balance_dirty_pages_ratelimited_nr(struct address_space *mapping,

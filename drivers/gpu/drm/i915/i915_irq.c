@@ -171,10 +171,10 @@ void intel_enable_asle (struct drm_device *dev)
 		ironlake_enable_display_irq(dev_priv, DE_GSE);
 	else {
 		i915_enable_pipestat(dev_priv, 1,
-				     I915_LEGACY_BLC_EVENT_ENABLE);
+				     PIPE_LEGACY_BLC_EVENT_ENABLE);
 		if (IS_I965G(dev))
 			i915_enable_pipestat(dev_priv, 0,
-					     I915_LEGACY_BLC_EVENT_ENABLE);
+					     PIPE_LEGACY_BLC_EVENT_ENABLE);
 	}
 }
 
@@ -842,7 +842,6 @@ irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
 	u32 iir, new_iir;
 	u32 pipea_stats, pipeb_stats;
 	u32 vblank_status;
-	u32 vblank_enable;
 	int vblank = 0;
 	unsigned long irqflags;
 	int irq_received;
@@ -856,13 +855,10 @@ irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
 
 	iir = I915_READ(IIR);
 
-	if (IS_I965G(dev)) {
-		vblank_status = I915_START_VBLANK_INTERRUPT_STATUS;
-		vblank_enable = PIPE_START_VBLANK_INTERRUPT_ENABLE;
-	} else {
-		vblank_status = I915_VBLANK_INTERRUPT_STATUS;
-		vblank_enable = I915_VBLANK_INTERRUPT_ENABLE;
-	}
+	if (IS_I965G(dev))
+		vblank_status = PIPE_START_VBLANK_INTERRUPT_STATUS;
+	else
+		vblank_status = PIPE_VBLANK_INTERRUPT_STATUS;
 
 	for (;;) {
 		irq_received = iir != 0;
@@ -940,26 +936,34 @@ irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
 		if (HAS_BSD(dev) && (iir & I915_BSD_USER_INTERRUPT))
 			DRM_WAKEUP(&dev_priv->bsd_ring.irq_queue);
 
-		if (iir & I915_DISPLAY_PLANE_A_FLIP_PENDING_INTERRUPT)
+		if (iir & I915_DISPLAY_PLANE_A_FLIP_PENDING_INTERRUPT) {
 			intel_prepare_page_flip(dev, 0);
+			if (dev_priv->flip_pending_is_done)
+				intel_finish_page_flip_plane(dev, 0);
+		}
 
-		if (iir & I915_DISPLAY_PLANE_B_FLIP_PENDING_INTERRUPT)
+		if (iir & I915_DISPLAY_PLANE_B_FLIP_PENDING_INTERRUPT) {
 			intel_prepare_page_flip(dev, 1);
+			if (dev_priv->flip_pending_is_done)
+				intel_finish_page_flip_plane(dev, 1);
+		}
 
 		if (pipea_stats & vblank_status) {
 			vblank++;
 			drm_handle_vblank(dev, 0);
-			intel_finish_page_flip(dev, 0);
+			if (!dev_priv->flip_pending_is_done)
+				intel_finish_page_flip(dev, 0);
 		}
 
 		if (pipeb_stats & vblank_status) {
 			vblank++;
 			drm_handle_vblank(dev, 1);
-			intel_finish_page_flip(dev, 1);
+			if (!dev_priv->flip_pending_is_done)
+				intel_finish_page_flip(dev, 1);
 		}
 
-		if ((pipea_stats & I915_LEGACY_BLC_EVENT_STATUS) ||
-		    (pipeb_stats & I915_LEGACY_BLC_EVENT_STATUS) ||
+		if ((pipea_stats & PIPE_LEGACY_BLC_EVENT_STATUS) ||
+		    (pipeb_stats & PIPE_LEGACY_BLC_EVENT_STATUS) ||
 		    (iir & I915_ASLE_INTERRUPT))
 			opregion_asle_intr(dev);
 
@@ -1225,16 +1229,21 @@ void i915_hangcheck_elapsed(unsigned long data)
 {
 	struct drm_device *dev = (struct drm_device *)data;
 	drm_i915_private_t *dev_priv = dev->dev_private;
-	uint32_t acthd;
+	uint32_t acthd, instdone, instdone1;
 
 	/* No reset support on this chip yet. */
 	if (IS_GEN6(dev))
 		return;
 
-	if (!IS_I965G(dev))
+	if (!IS_I965G(dev)) {
 		acthd = I915_READ(ACTHD);
-	else
+		instdone = I915_READ(INSTDONE);
+		instdone1 = 0;
+	} else {
 		acthd = I915_READ(ACTHD_I965);
+		instdone = I915_READ(INSTDONE_I965);
+		instdone1 = I915_READ(INSTDONE1);
+	}
 
 	/* If all work is done then ACTHD clearly hasn't advanced. */
 	if (list_empty(&dev_priv->render_ring.request_list) ||
@@ -1245,21 +1254,24 @@ void i915_hangcheck_elapsed(unsigned long data)
 		return;
 	}
 
-	if (dev_priv->last_acthd == acthd && dev_priv->hangcheck_count > 0) {
-		DRM_ERROR("Hangcheck timer elapsed... GPU hung\n");
-		i915_handle_error(dev, true);
-		return;
-	} 
+	if (dev_priv->last_acthd == acthd &&
+	    dev_priv->last_instdone == instdone &&
+	    dev_priv->last_instdone1 == instdone1) {
+		if (dev_priv->hangcheck_count++ > 1) {
+			DRM_ERROR("Hangcheck timer elapsed... GPU hung\n");
+			i915_handle_error(dev, true);
+			return;
+		}
+	} else {
+		dev_priv->hangcheck_count = 0;
+
+		dev_priv->last_acthd = acthd;
+		dev_priv->last_instdone = instdone;
+		dev_priv->last_instdone1 = instdone1;
+	}
 
 	/* Reset timer case chip hangs without another request being added */
 	mod_timer(&dev_priv->hangcheck_timer, jiffies + DRM_I915_HANGCHECK_PERIOD);
-
-	if (acthd != dev_priv->last_acthd)
-		dev_priv->hangcheck_count = 0;
-	else
-		dev_priv->hangcheck_count++;
-
-	dev_priv->last_acthd = acthd;
 }
 
 /* drm_dma.h hooks
@@ -1387,29 +1399,10 @@ int i915_driver_irq_postinstall(struct drm_device *dev)
 	dev_priv->pipestat[1] = 0;
 
 	if (I915_HAS_HOTPLUG(dev)) {
-		u32 hotplug_en = I915_READ(PORT_HOTPLUG_EN);
-
-		/* Note HDMI and DP share bits */
-		if (dev_priv->hotplug_supported_mask & HDMIB_HOTPLUG_INT_STATUS)
-			hotplug_en |= HDMIB_HOTPLUG_INT_EN;
-		if (dev_priv->hotplug_supported_mask & HDMIC_HOTPLUG_INT_STATUS)
-			hotplug_en |= HDMIC_HOTPLUG_INT_EN;
-		if (dev_priv->hotplug_supported_mask & HDMID_HOTPLUG_INT_STATUS)
-			hotplug_en |= HDMID_HOTPLUG_INT_EN;
-		if (dev_priv->hotplug_supported_mask & SDVOC_HOTPLUG_INT_STATUS)
-			hotplug_en |= SDVOC_HOTPLUG_INT_EN;
-		if (dev_priv->hotplug_supported_mask & SDVOB_HOTPLUG_INT_STATUS)
-			hotplug_en |= SDVOB_HOTPLUG_INT_EN;
-		if (dev_priv->hotplug_supported_mask & CRT_HOTPLUG_INT_STATUS)
-			hotplug_en |= CRT_HOTPLUG_INT_EN;
-		/* Ignore TV since it's buggy */
-
-		I915_WRITE(PORT_HOTPLUG_EN, hotplug_en);
-
 		/* Enable in IER... */
 		enable_mask |= I915_DISPLAY_PORT_INTERRUPT;
 		/* and unmask in IMR */
-		i915_enable_irq(dev_priv, I915_DISPLAY_PORT_INTERRUPT);
+		dev_priv->irq_mask_reg &= ~I915_DISPLAY_PORT_INTERRUPT;
 	}
 
 	/*
@@ -1427,15 +1420,40 @@ int i915_driver_irq_postinstall(struct drm_device *dev)
 	}
 	I915_WRITE(EMR, error_mask);
 
-	/* Disable pipe interrupt enables, clear pending pipe status */
-	I915_WRITE(PIPEASTAT, I915_READ(PIPEASTAT) & 0x8000ffff);
-	I915_WRITE(PIPEBSTAT, I915_READ(PIPEBSTAT) & 0x8000ffff);
-	/* Clear pending interrupt status */
-	I915_WRITE(IIR, I915_READ(IIR));
-
-	I915_WRITE(IER, enable_mask);
 	I915_WRITE(IMR, dev_priv->irq_mask_reg);
+	I915_WRITE(IER, enable_mask);
 	(void) I915_READ(IER);
+
+	if (I915_HAS_HOTPLUG(dev)) {
+		u32 hotplug_en = I915_READ(PORT_HOTPLUG_EN);
+
+		/* Note HDMI and DP share bits */
+		if (dev_priv->hotplug_supported_mask & HDMIB_HOTPLUG_INT_STATUS)
+			hotplug_en |= HDMIB_HOTPLUG_INT_EN;
+		if (dev_priv->hotplug_supported_mask & HDMIC_HOTPLUG_INT_STATUS)
+			hotplug_en |= HDMIC_HOTPLUG_INT_EN;
+		if (dev_priv->hotplug_supported_mask & HDMID_HOTPLUG_INT_STATUS)
+			hotplug_en |= HDMID_HOTPLUG_INT_EN;
+		if (dev_priv->hotplug_supported_mask & SDVOC_HOTPLUG_INT_STATUS)
+			hotplug_en |= SDVOC_HOTPLUG_INT_EN;
+		if (dev_priv->hotplug_supported_mask & SDVOB_HOTPLUG_INT_STATUS)
+			hotplug_en |= SDVOB_HOTPLUG_INT_EN;
+		if (dev_priv->hotplug_supported_mask & CRT_HOTPLUG_INT_STATUS) {
+			hotplug_en |= CRT_HOTPLUG_INT_EN;
+
+			/* Programming the CRT detection parameters tends
+			   to generate a spurious hotplug event about three
+			   seconds later.  So just do it once.
+			*/
+			if (IS_G4X(dev))
+				hotplug_en |= CRT_HOTPLUG_ACTIVATION_PERIOD_64;
+			hotplug_en |= CRT_HOTPLUG_VOLTAGE_COMPARE_50;
+		}
+
+		/* Ignore TV since it's buggy */
+
+		I915_WRITE(PORT_HOTPLUG_EN, hotplug_en);
+	}
 
 	opregion_enable_asle(dev);
 

@@ -633,4 +633,3 @@ const struct i2c_algorithm nouveau_dp_i2c_algo = {
 	.master_xfer = nouveau_dp_i2c_xfer,
 	.functionality = nouveau_dp_i2c_func
 };
-
