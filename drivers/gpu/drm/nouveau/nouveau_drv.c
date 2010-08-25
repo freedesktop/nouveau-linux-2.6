@@ -434,6 +434,12 @@ static int __init nouveau_init(void)
 	if (!nouveau_modeset)
 		return 0;
 
+#if defined(CONFIG_FRAMEBUFFER_CONSOLE_MODULE)
+	request_module("fbcon");
+#elif !defined(CONFIG_FRAMEBUFFER_CONSOLE)
+	printk(KERN_INFO "CONFIG_FRAMEBUFFER_CONSOLE was not enabled. You won't get any console output.\n");
+#endif
+
 	nouveau_register_dsm_handler();
 	return drm_init(&driver);
 }
