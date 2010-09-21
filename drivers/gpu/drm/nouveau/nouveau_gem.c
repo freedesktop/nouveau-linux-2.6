@@ -631,21 +631,6 @@ nouveau_gem_ioctl_pushbuf(struct drm_device *dev, void *data,
 		bo[push[i].bo_index].read_domains |= (1 << 31);
 	}
 
-	/* Mark push buffers as being used on PFIFO, the validation code
-	 * will then make sure that if the pushbuf bo moves, that they
-	 * happen on the kernel channel, which will in turn cause a sync
-	 * to happen before we try and submit the push buffer.
-	 */
-	for (i = 0; i < req->nr_push; i++) {
-		if (push[i].bo_index >= req->nr_buffers) {
-			NV_ERROR(dev, "push %d buffer not in list\n", i);
-			ret = -EINVAL;
-			goto out;
-		}
-
-		bo[push[i].bo_index].read_domains |= (1 << 31);
-	}
-
 	/* Validate buffer list */
 	ret = nouveau_gem_pushbuf_validate(chan, file_priv, bo, req->buffers,
 					   req->nr_buffers, &op, &do_reloc);
