@@ -680,6 +680,7 @@ struct drm_nouveau_private {
 	struct backlight_device *backlight;
 
 	struct nouveau_channel *evo;
+	u32 evo_alloc;
 	struct {
 		struct dcb_entry *dcb;
 		u16 script;
