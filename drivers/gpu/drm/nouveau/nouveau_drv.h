@@ -315,21 +315,9 @@ struct nouveau_fifo_engine {
 	int  (*unload_context)(struct drm_device *);
 };
 
-struct nouveau_pgraph_object_method {
-	int id;
-	int (*exec)(struct nouveau_channel *chan, int grclass, int mthd,
-		      uint32_t data);
-};
-
-struct nouveau_pgraph_object_class {
-	int id;
-	u32 engine;
-	struct nouveau_pgraph_object_method *methods;
-};
-
 struct nouveau_pgraph_engine {
-	struct nouveau_pgraph_object_class *grclass;
 	bool accel_blocked;
+	bool registered;
 	int grctx_size;
 
 	/* NV2x/NV3x context table (0x400780) */
@@ -582,6 +570,7 @@ struct drm_nouveau_private {
 	bool ramin_available;
 	struct drm_mm ramin_heap;
 	struct list_head gpuobj_list;
+	struct list_head classes;
 
 	struct nouveau_bo *vga_ram;
 
@@ -808,12 +797,29 @@ extern void nouveau_channel_ref(struct nouveau_channel *chan,
 				struct nouveau_channel **pchan);
 
 /* nouveau_object.c */
+#define NVOBJ_CLASS(d,c,e) do {                                                \
+	int ret = nouveau_gpuobj_class_new((d), (c), NVOBJ_ENGINE_##e);        \
+	if (ret)                                                               \
+		return ret;                                                    \
+} while(0)
+
+#define NVOBJ_MTHD(d,c,m,e) do {                                               \
+	int ret = nouveau_gpuobj_mthd_new((d), (c), (m), (e));                 \
+	if (ret)                                                               \
+		return ret;                                                    \
+} while(0)
+
 extern int  nouveau_gpuobj_early_init(struct drm_device *);
 extern int  nouveau_gpuobj_init(struct drm_device *);
 extern void nouveau_gpuobj_takedown(struct drm_device *);
 extern int  nouveau_gpuobj_suspend(struct drm_device *dev);
 extern void nouveau_gpuobj_suspend_cleanup(struct drm_device *dev);
 extern void nouveau_gpuobj_resume(struct drm_device *dev);
+extern int  nouveau_gpuobj_class_new(struct drm_device *, u32 class, u32 eng);
+extern int  nouveau_gpuobj_mthd_new(struct drm_device *, u32 class, u32 mthd,
+				    int (*exec)(struct nouveau_channel *,
+					        u32 class, u32 mthd, u32 data));
+extern int  nouveau_gpuobj_mthd_call(struct nouveau_channel *, u32, u32, u32);
 extern int nouveau_gpuobj_channel_init(struct nouveau_channel *,
 				       uint32_t vram_h, uint32_t tt_h);
 extern void nouveau_gpuobj_channel_takedown(struct nouveau_channel *);
@@ -1033,7 +1039,6 @@ extern int  nvc0_fifo_load_context(struct nouveau_channel *);
 extern int  nvc0_fifo_unload_context(struct drm_device *);
 
 /* nv04_graph.c */
-extern struct nouveau_pgraph_object_class nv04_graph_grclass[];
 extern int  nv04_graph_init(struct drm_device *);
 extern void nv04_graph_takedown(struct drm_device *);
 extern void nv04_graph_fifo_access(struct drm_device *, bool);
@@ -1045,7 +1050,6 @@ extern int  nv04_graph_unload_context(struct drm_device *);
 extern void nv04_graph_context_switch(struct drm_device *);
 
 /* nv10_graph.c */
-extern struct nouveau_pgraph_object_class nv10_graph_grclass[];
 extern int  nv10_graph_init(struct drm_device *);
 extern void nv10_graph_takedown(struct drm_device *);
 extern struct nouveau_channel *nv10_graph_channel(struct drm_device *);
@@ -1058,8 +1062,6 @@ extern void nv10_graph_set_region_tiling(struct drm_device *, int, uint32_t,
 					 uint32_t, uint32_t);
 
 /* nv20_graph.c */
-extern struct nouveau_pgraph_object_class nv20_graph_grclass[];
-extern struct nouveau_pgraph_object_class nv30_graph_grclass[];
 extern int  nv20_graph_create_context(struct nouveau_channel *);
 extern void nv20_graph_destroy_context(struct nouveau_channel *);
 extern int  nv20_graph_load_context(struct nouveau_channel *);
@@ -1071,7 +1073,6 @@ extern void nv20_graph_set_region_tiling(struct drm_device *, int, uint32_t,
 					 uint32_t, uint32_t);
 
 /* nv40_graph.c */
-extern struct nouveau_pgraph_object_class nv40_graph_grclass[];
 extern int  nv40_graph_init(struct drm_device *);
 extern void nv40_graph_takedown(struct drm_device *);
 extern struct nouveau_channel *nv40_graph_channel(struct drm_device *);
@@ -1084,7 +1085,6 @@ extern void nv40_graph_set_region_tiling(struct drm_device *, int, uint32_t,
 					 uint32_t, uint32_t);
 
 /* nv50_graph.c */
-extern struct nouveau_pgraph_object_class nv50_graph_grclass[];
 extern int  nv50_graph_init(struct drm_device *);
 extern void nv50_graph_takedown(struct drm_device *);
 extern void nv50_graph_fifo_access(struct drm_device *, bool);
