@@ -78,6 +78,12 @@ nv84_crypt_destroy_context(struct nouveau_channel *chan)
 	nouveau_gpuobj_ref(NULL, &chan->crypt_ctx);
 }
 
+void
+nv84_crypt_tlb_flush(struct drm_device *dev)
+{
+	nv50_vm_flush(dev, 0x0a);
+}
+
 int
 nv84_crypt_init(struct drm_device *dev)
 {
