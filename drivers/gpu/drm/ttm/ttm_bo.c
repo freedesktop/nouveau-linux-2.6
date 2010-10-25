@@ -449,6 +449,7 @@ out_err:
 static void ttm_bo_cleanup_memtype_use(struct ttm_buffer_object *bo)
 {
 	struct ttm_bo_global *glob = bo->glob;
+	struct ttm_mem_reg tmp_mem;
 
 	if (bo->ttm) {
 
@@ -464,14 +465,14 @@ static void ttm_bo_cleanup_memtype_use(struct ttm_buffer_object *bo)
 		spin_lock(&glob->lru_lock);
 	}
 
-	if (bo->mem.mm_node) {
-		ttm_bo_mem_put(bo, &bo->mem);
-		bo->mem.mm_node = NULL;
-	}
+	tmp_mem = bo->mem;
+	bo->mem.mm_node = NULL;
 
 	atomic_set(&bo->reserved, 0);
 	wake_up_all(&bo->event_queue);
 	spin_unlock(&glob->lru_lock);
+
+	ttm_bo_mem_put(bo, &tmp_mem);
 }
 
 
