@@ -288,6 +288,7 @@ nouveau_sysfs_fini(struct drm_device *dev)
 	}
 }
 
+#ifdef CONFIG_HWMON
 static ssize_t
 nouveau_hwmon_show_temp(struct device *d, struct device_attribute *a, char *buf)
 {
@@ -399,10 +400,12 @@ static struct attribute *hwmon_attributes[] = {
 static const struct attribute_group hwmon_attrgroup = {
 	.attrs = hwmon_attributes,
 };
+#endif
 
 static int
 nouveau_hwmon_init(struct drm_device *dev)
 {
+#ifdef CONFIG_HWMON
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_pm_engine *pm = &dev_priv->engine.pm;
 	struct device *hwmon_dev;
@@ -429,13 +432,14 @@ nouveau_hwmon_init(struct drm_device *dev)
 	}
 
 	pm->hwmon = hwmon_dev;
-
+#endif
 	return 0;
 }
 
 static void
 nouveau_hwmon_fini(struct drm_device *dev)
 {
+#ifdef CONFIG_HWMON
 	struct drm_nouveau_private *dev_priv = dev->dev_private;
 	struct nouveau_pm_engine *pm = &dev_priv->engine.pm;
 
@@ -443,6 +447,7 @@ nouveau_hwmon_fini(struct drm_device *dev)
 		sysfs_remove_group(&pm->hwmon->kobj, &hwmon_attrgroup);
 		hwmon_device_unregister(pm->hwmon);
 	}
+#endif
 }
 
 #ifdef CONFIG_ACPI
