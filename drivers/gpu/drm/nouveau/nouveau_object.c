@@ -300,7 +300,6 @@ nouveau_gpuobj_takedown(struct drm_device *dev)
 	BUG_ON(!list_empty(&dev_priv->gpuobj_list));
 }
 
-
 static void
 nouveau_gpuobj_del(struct kref *ref)
 {

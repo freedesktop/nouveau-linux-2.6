@@ -667,6 +667,8 @@ extern int ttm_bo_mem_space(struct ttm_buffer_object *bo,
 
 extern void ttm_bo_mem_put(struct ttm_buffer_object *bo,
 			   struct ttm_mem_reg *mem);
+extern void ttm_bo_mem_put_locked(struct ttm_buffer_object *bo,
+				  struct ttm_mem_reg *mem);
 
 /**
  * ttm_bo_wait_for_cpu

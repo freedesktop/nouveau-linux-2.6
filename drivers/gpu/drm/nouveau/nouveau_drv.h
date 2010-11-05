@@ -1037,10 +1037,6 @@ extern int  nv50_fb_init(struct drm_device *);
 extern void nv50_fb_takedown(struct drm_device *);
 extern void nv50_fb_vm_trap(struct drm_device *, int display, const char *);
 
-/* nv50_fb.c */
-extern int  nv50_fb_init(struct drm_device *);
-extern void nv50_fb_takedown(struct drm_device *);
-
 /* nvc0_fb.c */
 extern int  nvc0_fb_init(struct drm_device *);
 extern void nvc0_fb_takedown(struct drm_device *);
