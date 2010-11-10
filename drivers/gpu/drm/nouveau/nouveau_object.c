@@ -653,7 +653,7 @@ found:
 
 	switch (oc->engine) {
 	case NVOBJ_ENGINE_GR:
-		if (dev_priv->chipset >= NV_50 && !chan->ramin_grctx) {
+		if (dev_priv->card_type >= NV_50 && !chan->ramin_grctx) {
 			struct nouveau_pgraph_engine *pgraph =
 				&dev_priv->engine.graph;
 
