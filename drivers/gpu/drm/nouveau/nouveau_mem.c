@@ -196,7 +196,6 @@ nv50_mem_vm_bind_linear(struct drm_device *dev, uint64_t virt, uint32_t size,
 			}
 		}
 	}
-	dev_priv->engine.instmem.flush(dev);
 
 	dev_priv->engine.instmem.flush(dev);
 	dev_priv->engine.fifo.tlb_flush(dev);
