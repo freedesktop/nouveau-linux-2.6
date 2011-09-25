@@ -21,9 +21,9 @@
 ifndef LINUXDIR
 RUNNING_REL := $(shell uname -r)
 
-LINUXDIR := $(shell if [ -e /lib/modules/$(RUNNING_REL)/source ]; then \
-		echo /lib/modules/$(RUNNING_REL)/source; \
-		else echo /lib/modules/$(RUNNING_REL)/build; fi)
+LINUXDIR := $(shell if [ -e /lib/modules/$(RUNNING_REL)/build ]; then \
+		echo /lib/modules/$(RUNNING_REL)/build; \
+		else echo /lib/modules/$(RUNNING_REL)/source; fi)
 endif
 
 NOUVEAUGITREMOTE ?= origin
