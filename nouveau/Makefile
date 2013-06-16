@@ -1,6 +1,7 @@
 # This Makefile is loosely based on the drm.git/linux-core/Makefile and
 # the preliminary work by Christopher James Halse Rogers.
 # Edited by Pekka Paalanen <pq@iki.fi>
+# Edited by Albert Pool <albertpool@solcon.nl>
 
 # By default, the build is done against the running linux kernel source.
 # To build against a different kernel source tree, set LINUXDIR:
@@ -29,10 +30,10 @@ endif
 NOUVEAUGITREMOTE ?= origin
 NOUVEAUROOTDIR ?= $(CURDIR)/..
 override NOUVEAUROOTDIR := $(abspath $(NOUVEAUROOTDIR))
-HEADERINSDIR ?= $(NOUVEAUROOTDIR)/usr/include/drm
+HEADERINSDIR ?= $(NOUVEAUROOTDIR)/usr/include/uapi/drm
 override HEADERINSDIR := $(abspath $(HEADERINSDIR))
 
-TESTFILE := include/drm/nouveau_drm.h
+TESTFILE := include/uapi/drm/nouveau_drm.h
 ifeq ($(wildcard $(NOUVEAUROOTDIR)/$(TESTFILE)),)
 $(error $(NOUVEAUROOTDIR) does not look like the right kernel tree, \
 	please set NOUVEAUROOTDIR)
@@ -41,7 +42,7 @@ endif
 GIT_REVISION := $(shell GIT_DIR=$(NOUVEAUROOTDIR)/.git \
 	git describe --always --abbrev=17 2> /dev/null)
 
-DRMINC := $(NOUVEAUROOTDIR)/include/drm
+DRMINC := $(NOUVEAUROOTDIR)/include/uapi/drm
 DRMDIR := $(NOUVEAUROOTDIR)/drivers/gpu/drm
 DRMCFG := \
 	CONFIG_DRM=m \
@@ -57,11 +58,14 @@ DRMCFG := \
 	CONFIG_DRM_R128=n \
 	CONFIG_DRM_RADEON=n \
 	CONFIG_DRM_MGA=n \
+	CONFIG_DRM_MGAG200=n \
 	CONFIG_DRM_I810=n \
 	CONFIG_DRM_I830=n \
 	CONFIG_DRM_I915=n \
+	CONFIG_DRM_GMA500=n \
 	CONFIG_DRM_SIS=n \
 	CONFIG_DRM_SAVAGE=n \
+	CONFIG_DRM_UDL=n \
 	CONFIG_DRM_VIA=n \
 	CONFIG_DRM_VMWGFX=n
 
